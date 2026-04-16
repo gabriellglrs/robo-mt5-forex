@@ -1,27 +1,34 @@
-# Roadmap do Projeto: Robo MT5 v2
+﻿# Roadmap do Projeto: Robo MT5 v2
 
-Este roadmap detalha o ciclo de desenvolvimento do robô de trading automatizado.
+## Milestone 1: Base Operacional (Historico)
+- [x] Fases 1 a 6 concluidas (base de conexao, sinais, execucao, dashboard e comandos).
 
-## Milestone 1: MVP Operacional & Persistência (Concluído)
+## Milestone 2: Aderencia Total a Estrategia Fimathe (Ativo)
 
-- [x] **Phase 1: Conexão e Análise de Dados Semanais**
-    - [x] Integração estável com MT5.
-    - [x] Detector de suporte e resistência baseado em estatística/pivôs.
-- [x] **Phase 2: Lógica de Indicadores e Sinais**
-    - [x] Implementação de RSI, Bollinger, Stochastic, PinBar e Volume.
-    - [x] Motor de confluência multi-timeframe.
-- [x] **Phase 3: Execução de Trades e Gestão de Risco**
-    - [x] Cálculo de lote e SL/TP dinâmicos.
-    - [x] Executor de ordens a mercado com Magic Number.
-- [x] **Phase 4: Banco de Dados e Histórico**
-    - [x] Docker com MySQL 8.0 e Adminer.
-    - [x] Persistência de logs de sistema e snapshot de trades.
-- [x] **Phase 5: Dashboard Interativo (Streamlit)**
-    - [x] Curva de Equity em tempo real.
-    - [x] KPIs de performance (Win Rate, PnL).
-- [x] **Phase 6: Centro de Comando & Redesign Premium**
-    - [x] Interface de configuração Web (sem tocar no código).
-    - [x] Monitoramento de Heartbeat (Luz de Status).
+- [x] **Phase 7: SPEC, Gap Analysis e Implementacao Fimathe**
+  - [x] Passo 1: SPEC executavel (IF/THEN).
+  - [x] Passo 2: Gap analysis codigo vs estrategia.
+  - [x] Passo 3: Motor de decisao inicial implementado (A/B, projecoes, agrupamento).
+  - [x] Passo 4: Gestao de risco estrutural inicial implementada.
+  - [x] Passo 5: Configuracoes e UX Fimathe avancadas em PT-BR.
+  - [x] Pendencia final 1: Ciclo explicito de stop por eventos (topo/50/100).
+  - [x] Pendencia final 2: Rastreio completo por `rule_id` (FIM-001..FIM-014) no fluxo em tempo real.
+  - [x] Pendencia final 3: Testes de cenario/replay para aderencia comportamental.
+
+- [ ] **Phase 8: Motor de Estados Fimathe**
+  - [ ] Ponto-A/Ponto-B objetivos.
+  - [ ] Projecoes 50/80/85/100.
+  - [ ] Agrupamento no timeframe menor.
+
+- [ ] **Phase 9: Gestao de Risco Fimathe**
+  - [ ] Stop tecnico estrutural.
+  - [ ] Movimentacao de stop por topo/50/100.
+  - [ ] Risco percentual real com teto de 3%.
+
+- [ ] **Phase 10: UX e Configuracoes Completas**
+  - [ ] Todos os parametros da tecnica no painel.
+  - [ ] Baloes de ajuda completos em PT-BR.
+  - [ ] Auditoria com rastreio por regra da estrategia.
 
 ---
-**Status do Projeto**: 100% CONCLUÍDO | MODO OPERACIONAL ATIVO
+**Status Atual**: Milestone 2 com Phase 7 concluida. Proximo foco: executar Phase 8 (motor de estados Fimathe).

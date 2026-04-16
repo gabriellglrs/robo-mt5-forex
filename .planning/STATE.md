@@ -1,15 +1,51 @@
+﻿---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: active
+last_updated: "2026-04-16T15:10:00.000Z"
+progress:
+  total_phases: 6
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 2
+  percent: 33
+---
+
 # Project State: robo-mt5-v2
 
 ## Contexto Atual
-O robô está funcional e capaz de executar trades. A lógica de sinal modular e a gestão de risco estão integradas e validadas (pendente apenas ativação do AlgoTrading no terminal).
+
+Projeto com Phase 7 finalizada e aderencia tecnica Fimathe consolidada (motor de sinal, ciclo de stop e rastreio por regra).
 
 ## Status das Fases
-- [x] Phase 1: Conexão e Análise de Dados Semanais
-- [x] Phase 2: Lógica de Indicadores e Sinais
-- [x] Phase 3: Execução de Trades e Gestão de Risco
-- [/] Phase 4: Banco de Dados e Histórico (Próxima etapa)
-- [ ] Phase 5: Dashboard Interativo (Streamlit)
 
-## Próximos Passos
-- Implementar SQLite para persistência de trades.
-- Iniciar planejamento da Phase 4.
+- [x] Phase 1 a 6: Base operacional historica
+- [x] Phase 7: Implementacao Fimathe concluida
+- [ ] Phase 8: Motor de estados Fimathe
+- [ ] Phase 9: Gestao de risco Fimathe
+- [ ] Phase 10: UX/configuracoes completas
+
+## Entregas fechadas na Phase 7
+
+- SPEC executavel: `.planning/phases/07-fimathe-aderencia-total/07-STEP1-SPEC.md`
+- Gap analysis: `.planning/phases/07-fimathe-aderencia-total/07-STEP2-GAP-ANALYSIS.md`
+- Plano de execucao: `.planning/phases/07-fimathe-aderencia-total/07-PLAN.md`
+- Implementacoes tecnicas concluidas:
+  - `src/analysis/signals.py`
+  - `src/execution/risk.py`
+  - `src/execution/fimathe_cycle.py`
+  - `src/main.py`
+  - `src/ui/dashboard.py`
+  - `tests/test_fimathe_cycle.py`
+
+## Validacao comportamental
+
+- Ciclo explicito de stop por eventos (perdeu topo, perdeu 50%, perdeu 100%) ativo no runtime.
+- Rastreio por `rule_id` e `next_trigger` no fluxo em tempo real e no payload de analise.
+- Testes de cenario/replay adicionados para validar comportamento do ciclo FIM-010.
+
+## Proximo passo imediato
+
+Iniciar Phase 8 (motor de estados Fimathe) com refinamento das transicoes e cobertura de cenarios SELL.
+
