@@ -1,23 +1,32 @@
 # Projeto: Robo MT5 v2 (Enterprise Edition)
 
-Este projeto consiste em um robô de trading automatizado de alta performance para o MetaTrader 5, com foco em reversões de níveis semanais e análise técnica de confluência.
+Este projeto consiste em um robô de trading automatizado de alta performance para o MetaTrader 5, com foco na estratégia Fimathe com confluência avançada de indicadores.
 
 ## Visão Geral
-- **Status**: ✅ FINALIZADO & OPERACIONAL
+- **Status**: ✅ FASE DE HOMOLOGAÇÃO (Milestone 2)
 - **Linguagem**: Python 3.14
-- **Arquitetura**: Modular (Análise -> Execução -> Persistência -> UI)
-- **Infraestrutura**: Docker (MySQL 8.0)
+- [x] **Phase 10: UX e Configuracoes Completas**
+  - [x] Todos os parametros da tecnica no painel (FIM-001..FIM-011).
+  - [x] Tooltips técnicos para auditoria por regra.
+  - [x] Hot-Reload de ativos e regras (Sync Dinâmico).
+  - [x] Ordenação numérica do Gestor de Regras.
 
-## Destaques da Solução
-- **Sinais Inteligentes**: Confluência de 5 indicadores e detector de níveis estatísticos.
-- **Risco Profissional**: Gestão de lotes e travas de segurança integradas.
-- **Centro de Comando**: Dashboard Streamlit com edição de configurações via web.
-- **Auditoria Full**: Cada trade e evento de sistema é persistido no banco de dados.
-
-## Milestones
-- [x] Milestone 1: Integração & Persistência (Concluído)
-- [ ] Milestone 2: Otimização de IA (Futuro)
-- [ ] Milestone 3: Multi-Symbol & Nuvem (Futuro)
+### Phase 10: UX e Configuracoes Completas
+**Goal**: Completar UX operacional da tecnica Fimathe no painel, com configuracoes completas e auditoria didatica por regra.
+**Depends on**: Phase 8, Phase 9
+**Success Criteria**:
+1. Todos os parametros da tecnica expostos na UI com ajuda em PT-BR.
+2. Painel de auditoria mostra regra ativa, estado atual e proximo gatilho.
+3. Fluxo runtime apresenta explicacao clara para entradas, bloqueios e ajustes de risco.
+4. Hot-reload de ativos permite mudar o monitoramento sem reiniciar o robô.
 
 ---
-*Última atualização: 2026-04-16*
+**Status Atual**: Fase 10 CONCLUÍDA. Iniciando FASE 11 (Homologação e Testes de Stress).
+
+## Milestones
+- [x] Milestone 1: Base Operacional & Dashboard Inicial (Concluído)
+- [x] Milestone 2: Aderência Total à Estratégia Fimathe (Em Homologação)
+- [ ] Milestone 3: Otimização de IA & Nuvem (Futuro)
+
+---
+*Última atualização: 2026-04-16 - Fimathe UX Finalized*

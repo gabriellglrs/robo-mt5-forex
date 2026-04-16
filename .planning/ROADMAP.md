@@ -63,12 +63,11 @@
 ### Phase 10: UX e Configuracoes Completas
 **Goal**: Completar UX operacional da tecnica Fimathe no painel, com configuracoes completas e auditoria didatica por regra.
 **Depends on**: Phase 8, Phase 9
-**Requirements**: TBD
 **Success Criteria**:
 1. Todos os parametros da tecnica expostos na UI com ajuda em PT-BR.
 2. Painel de auditoria mostra regra ativa, estado atual e proximo gatilho.
 3. Fluxo runtime apresenta explicacao clara para entradas, bloqueios e ajustes de risco.
-4. Operacao da estrategia pode ser conduzida sem edicao manual de codigo.
+4. Hot-reload de ativos permite mudar o monitoramento sem reiniciar o robô.
 
 ### Phase 11: Homologação e Testes de Funcionalidade Fimathe (Compliance com Manual)
 
@@ -81,4 +80,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 11 to break down)
 
 ---
-**Status Atual**: Projeto CONCLUÍDO. Milestone 2 finalizado com 100% de aderência ao manual Fimathe.
+**Status Atual**: Fase 10 CONCLUÍDA. Iniciando FASE 11 (Homologação e Testes de Stress).
