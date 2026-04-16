@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 
 import MetaTrader5 as mt5
 
@@ -66,7 +66,7 @@ class OrderEngine:
             self.logger.error(f"Falha ao buscar contexto do ticket #{ticket}: {exc}")
             return {}
 
-    def send_market_order(self, symbol, order_type, volume, sl, tp, timeframe="M5", strategy="fimathe", indicators=None, comment="RoboMT5-v2"):
+    def send_market_order(self, symbol, order_type, volume, sl, tp, deviation=20, timeframe="M5", strategy="fimathe", indicators=None, comment="RoboMT5-v2"):
         """Envia uma ordem a mercado e registra no banco de dados."""
         tick = mt5.symbol_info_tick(symbol)
         if tick is None:
@@ -83,7 +83,7 @@ class OrderEngine:
             "price": float(price),
             "sl": float(sl),
             "tp": float(tp),
-            "deviation": 20,
+            "deviation": int(deviation),
             "magic": self.magic,
             "comment": comment,
             "type_time": mt5.ORDER_TIME_GTC,

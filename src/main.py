@@ -610,10 +610,27 @@ def main():
 
         loop_counter = 0
         while True:
-            # Recarrega configurações para captar mudanças da UI (ex: running_state, risk_percent)
+            # Recarrega configurações para captar mudanças da UI
             new_settings = load_settings()
             if new_settings:
                 settings = new_settings
+                
+                # Verificação dinâmica de símbolos (Ativos Monitorados)
+                current_config_symbols = parse_symbols(settings)
+                active_symbols = list(engines.keys())
+                
+                if set(current_config_symbols) != set(active_symbols):
+                    logger.info("Mudança detectada na lista de ativos. Recarregando motores...")
+                    # Para simplificar, reconstruímos os motores necessários
+                    # TODO: Otimizar para adicionar/remover apenas o delta
+                    new_engines = build_symbol_engines(current_config_symbols, settings, db_manager)
+                    if new_engines:
+                        engines = new_engines
+                        # Resetar logs de intervalo para os novos ativos
+                        for s in engines.keys():
+                            if s not in last_analysis_log_per_symbol:
+                                last_analysis_log_per_symbol[s] = 0.0
+                                last_order_ts_per_symbol[s] = 0.0
 
             is_running = settings.get("running_state", False)
 
