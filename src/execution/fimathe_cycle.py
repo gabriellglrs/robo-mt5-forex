@@ -142,7 +142,41 @@ def evaluate_fimathe_cycle_event(side, current_price, open_price, context, state
     fallback_sl = _calc_breakeven_sl(side, open_price, breakeven_offset_points, point)
     action = None
 
-    if not state.get("moved_on_top") and reached_top_ref and run_points >= min_profit_points and retrace_points >= top_retrace_points:
+    # 1) Perdeu 100% (Proativo: atingiu o nível de 100% da projeção)
+    # Maior nível de proteção primeiro
+    if (
+        not state.get("moved_on_100")
+        and projection_100 is not None
+        and state.get("reached_100")
+    ):
+        action = {
+            "event": "perdeu_100",
+            "rule_id": "FIM-010",
+            "candidate_sl": _calc_event_100_sl(side, context, fallback_sl, protection_buffer_points, point),
+            "note": "Atingiu 100% da projecao. Stop movido para travar lucro nos 50%.",
+        }
+        state["moved_on_100"] = True
+        state["moved_on_50"] = True  # Marca 50 como movido tambem
+        state["last_event"] = action["event"]
+
+    # 2) Perdeu 50% (Proativo: atingiu o nível de 50% da projeção)
+    elif (
+        not state.get("moved_on_50")
+        and projection_50 is not None
+        and state.get("reached_50")
+    ):
+        action = {
+            "event": "perdeu_50",
+            "rule_id": "FIM-010",
+            "candidate_sl": _calc_event_50_sl(side, context, fallback_sl, protection_buffer_points, point),
+            "note": "Atingiu 50% da projecao. Stop movido para Break-even.",
+        }
+        state["moved_on_50"] = True
+        state["last_event"] = action["event"]
+
+    # 3) Perdeu Topo (Retratação do Topo)
+    # Deixamos por ultimo pois BE/Lock sao mais importantes se as condicoes coincidirem
+    elif not state.get("moved_on_top") and reached_top_ref and run_points >= min_profit_points and retrace_points >= top_retrace_points:
         action = {
             "event": "perdeu_topo",
             "rule_id": "FIM-010",
@@ -150,36 +184,6 @@ def evaluate_fimathe_cycle_event(side, current_price, open_price, context, state
             "note": "Perdeu topo da expansao. Stop movido para zona de protecao.",
         }
         state["moved_on_top"] = True
-        state["last_event"] = action["event"]
-
-    elif (
-        not state.get("moved_on_50")
-        and projection_50 is not None
-        and state.get("reached_50")
-        and _crossed_back_from_level(side, previous_price, current_price, projection_50)
-    ):
-        action = {
-            "event": "perdeu_50",
-            "rule_id": "FIM-010",
-            "candidate_sl": _calc_event_50_sl(side, context, fallback_sl, protection_buffer_points, point),
-            "note": "Perdeu 50% da projecao. Stop reposicionado para preservar estrutura.",
-        }
-        state["moved_on_50"] = True
-        state["last_event"] = action["event"]
-
-    elif (
-        not state.get("moved_on_100")
-        and projection_100 is not None
-        and state.get("reached_100")
-        and _crossed_back_from_level(side, previous_price, current_price, projection_100)
-    ):
-        action = {
-            "event": "perdeu_100",
-            "rule_id": "FIM-010",
-            "candidate_sl": _calc_event_100_sl(side, context, fallback_sl, protection_buffer_points, point),
-            "note": "Perdeu 100% da projecao. Stop movido novamente para faixa superior de protecao.",
-        }
-        state["moved_on_100"] = True
         state["last_event"] = action["event"]
 
     state["previous_price"] = current_price

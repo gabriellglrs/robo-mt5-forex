@@ -1,4 +1,4 @@
-﻿import json
+import json
 import logging
 from datetime import datetime
 
@@ -151,5 +151,24 @@ class DatabaseManager:
                 pass
 
     def log_event(self, level, module, message):
-        """Desativado: nao grava mais system_logs."""
-        return
+        """Grava log de evento no banco de dados."""
+        sql = """
+        INSERT INTO system_logs (level, module, message, timestamp)
+        VALUES (%s, %s, %s, %s)
+        """
+        data = (level, module, message, datetime.now())
+
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, data)
+            conn.commit()
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar log de evento: {exc}")
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()

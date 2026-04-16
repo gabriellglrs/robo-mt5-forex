@@ -20,5 +20,18 @@ services:
     ports:
       - "8080:8080"
 
+  web-dashboard:
+    build: 
+      context: ./web-dashboard
+      dockerfile: Dockerfile
+    container_name: robo-mt5-dashboard
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - mysql-db
+
 volumes:
   mysql_data:

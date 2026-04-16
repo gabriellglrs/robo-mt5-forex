@@ -1,8 +1,10 @@
-﻿import logging
+import logging
 
 import MetaTrader5 as mt5
 import numpy as np
 import pandas as pd
+
+from analysis.fimathe_state_engine import evaluate_state_machine, resolve_rule_meta
 
 
 class SignalDetector:
@@ -118,66 +120,8 @@ class SignalDetector:
         nearest_distance = min(abs(current_price - level) for level in levels)
         return nearest_distance / float(self.point)
 
-    def _resolve_rule_meta(self, reason, signal=None):
-        mapping = {
-            "setup_pronto": (
-                "FIM-008",
-                "Confluencia valida",
-                "Executar entrada com risco controlado.",
-            ),
-            "sem_dados_timeframe": (
-                "FIM-001",
-                "Coleta de dados",
-                "Aguardar mais candles no timeframe maior e menor.",
-            ),
-            "mercado_lateral": (
-                "FIM-002",
-                "Classificacao de mercado",
-                "Aguardar tendencia clara para liberar operacao.",
-            ),
-            "sem_regiao_ab": (
-                "FIM-003",
-                "Regiao A/B",
-                "Aguardar consolidacao valida para marcar ponto-A e ponto-B.",
-            ),
-            "fora_da_regiao_negociavel": (
-                "FIM-005",
-                "Regiao negociavel",
-                "Aguardar preco voltar para regiao A/B ou projecoes 50-100.",
-            ),
-            "aguardando_agrupamento": (
-                "FIM-006",
-                "Agrupamento",
-                "Aguardar consolidacao no timeframe menor.",
-            ),
-            "aguardando_rompimento_canal": (
-                "FIM-007",
-                "Rompimento e reteste",
-                "Aguardar rompimento do canal com buffer tecnico.",
-            ),
-            "aguardando_pullback": (
-                "FIM-007",
-                "Rompimento e reteste",
-                "Aguardar pullback/reteste dentro da tolerancia.",
-            ),
-            "longe_do_nivel_sr": (
-                "FIM-008",
-                "Regra anti-achometro",
-                "Aguardar toque/regiao S-R para completar confluencia.",
-            ),
-        }
 
-        default_meta = ("FIM-014", "Transparencia operacional", "Monitorar proximo gatilho tecnico.")
-        rule_id, rule_name, next_trigger = mapping.get(reason, default_meta)
-        if signal:
-            rule_id, rule_name, next_trigger = mapping["setup_pronto"]
-        return {
-            "rule_id": rule_id,
-            "rule_name": rule_name,
-            "next_trigger": next_trigger,
-        }
-
-    def evaluate_signal_details(self, current_price, levels, indicators=None):
+    def evaluate_signal_details(self, current_price, levels, indicators=None, current_spread=0.0):
         """Retorna diagnostico completo do setup Fimathe."""
         trend_tf = self.settings.get("trend_timeframe", "H1")
         entry_tf = self.settings.get("entry_timeframe", "M15")
@@ -200,10 +144,12 @@ class SignalDetector:
         entry_df = self._load_rates(entry_tf, entry_lookback + 20)
 
         if trend_df is None or entry_df is None:
-            reason = "sem_dados_timeframe"
+            technicals = {"data_ok": False}
+            decision = evaluate_state_machine(technicals, self.settings)
+            
             return {
                 "signal": None,
-                "reason": reason,
+                "reason": decision["reason"],
                 "mode": "FIMATHE",
                 "timeframes_expected": [trend_tf, entry_tf],
                 "timeframes_received": [],
@@ -213,16 +159,20 @@ class SignalDetector:
                 "nearest_level_points": nearest_level_points,
                 "trend_timeframe": trend_tf,
                 "entry_timeframe": entry_tf,
-                "rule_trace": {"FIM-001": "bloqueado"},
-                **self._resolve_rule_meta(reason),
+                "trend_direction": None,
+                "trend_slope_points": 0.0,
+                "rule_trace": decision["rule_trace"],
+                **resolve_rule_meta(decision["reason"]),
             }
 
         trend_direction, slope_points = self._detect_trend(trend_df.tail(trend_candles))
         if trend_direction is None:
-            reason = "mercado_lateral"
+            technicals = {"data_ok": True, "trend_direction": None}
+            decision = evaluate_state_machine(technicals, self.settings)
+            
             return {
                 "signal": None,
-                "reason": reason,
+                "reason": decision["reason"],
                 "mode": "FIMATHE",
                 "timeframes_expected": [trend_tf, entry_tf],
                 "timeframes_received": [trend_tf, entry_tf],
@@ -237,19 +187,22 @@ class SignalDetector:
                 "nearest_level_points": nearest_level_points,
                 "trend_timeframe": trend_tf,
                 "entry_timeframe": entry_tf,
-                "rule_trace": {
-                    "FIM-001": "ok",
-                    "FIM-002": "bloqueado_lateral",
-                },
-                **self._resolve_rule_meta(reason),
+                "trend_direction": "LATERAL",
+                "trend_slope_points": round(float(slope_points), 2),
+                "rule_trace": decision["rule_trace"],
+                **resolve_rule_meta(decision["reason"]),
             }
 
         projection_map = self._build_ab_projection(trend_df, trend_direction)
-        if projection_map.get("point_a") is None or projection_map.get("point_b") is None:
-            reason = "sem_regiao_ab"
+        ab_ok = projection_map.get("point_a") is not None and projection_map.get("point_b") is not None
+        
+        if not ab_ok:
+            technicals = {"data_ok": True, "trend_direction": trend_direction, "ab_ok": False}
+            decision = evaluate_state_machine(technicals, self.settings)
+            
             return {
                 "signal": None,
-                "reason": reason,
+                "reason": decision["reason"],
                 "mode": "FIMATHE",
                 "timeframes_expected": [trend_tf, entry_tf],
                 "timeframes_received": [trend_tf, entry_tf],
@@ -264,12 +217,10 @@ class SignalDetector:
                 "nearest_level_points": nearest_level_points,
                 "trend_timeframe": trend_tf,
                 "entry_timeframe": entry_tf,
-                "rule_trace": {
-                    "FIM-001": "ok",
-                    "FIM-002": "ok",
-                    "FIM-003": "bloqueado",
-                },
-                **self._resolve_rule_meta(reason),
+                "trend_direction": trend_direction,
+                "trend_slope_points": round(float(slope_points), 2),
+                "rule_trace": decision["rule_trace"],
+                **resolve_rule_meta(decision["reason"]),
             }
 
         nearest_trade_region_points = self._nearest_trade_region_points(current_price, projection_map)
@@ -298,8 +249,27 @@ class SignalDetector:
             pullback_ok = (last_high >= (channel_mid - pullback_tolerance_price)) if require_pullback else True
             candidate_signal = "SELL"
 
-        base_payload = {
-            "signal": None,
+        # Prepare technicals for the state machine
+        technicals = {
+            "data_ok": True,
+            "trend_direction": trend_direction,
+            "ab_ok": True,
+            "near_trade_region": near_trade_region,
+            "grouping_ok": grouping_map["grouping_ok"],
+            "breakout_ok": breakout_ok,
+            "pullback_ok": pullback_ok,
+            "near_sr": near_sr,
+            "candidate_signal": candidate_signal,
+            "current_spread": current_spread
+        }
+        
+        # Execute decision
+        decision = evaluate_state_machine(technicals, self.settings)
+
+        # Build final payload
+        return {
+            "signal": decision["signal"],
+            "reason": decision["reason"],
             "mode": "FIMATHE",
             "timeframes_expected": [trend_tf, entry_tf],
             "timeframes_received": [trend_tf, entry_tf],
@@ -322,6 +292,8 @@ class SignalDetector:
                     "grouping_range_points": grouping_map["grouping_range_points"],
                 },
             },
+            "current_spread": current_spread,
+            "max_spread_points": self.settings.get("max_spread_points", 0),
             "near_sr": near_sr,
             "sr_tolerance_points": tolerance_points,
             "nearest_level_points": nearest_level_points,
@@ -347,52 +319,11 @@ class SignalDetector:
             "projection_85": projection_map["projection_85"],
             "projection_100": projection_map["projection_100"],
             "candidate_signal": candidate_signal,
-            "rule_trace": {
-                "FIM-001": "ok",
-                "FIM-002": "ok",
-                "FIM-003": "ok",
-                "FIM-004": "ok",
-                "FIM-005": "ok" if near_trade_region else "bloqueado",
-                "FIM-006": "ok" if grouping_map["grouping_ok"] or (not require_grouping) else "bloqueado",
-                "FIM-007": "ok" if (breakout_ok and pullback_ok) else "bloqueado",
-                "FIM-008": "ok",
-            },
+            "rule_trace": decision["rule_trace"],
+            "rule_id": decision["rule_id"],
+            "rule_name": decision["rule_name"],
+            "next_trigger": decision["next_trigger"],
         }
-
-        if not near_trade_region:
-            base_payload["reason"] = "fora_da_regiao_negociavel"
-            base_payload.update(self._resolve_rule_meta(base_payload["reason"]))
-            base_payload["rule_trace"]["FIM-008"] = "bloqueado"
-            return base_payload
-
-        if require_grouping and not grouping_map["grouping_ok"]:
-            base_payload["reason"] = "aguardando_agrupamento"
-            base_payload.update(self._resolve_rule_meta(base_payload["reason"]))
-            base_payload["rule_trace"]["FIM-008"] = "bloqueado"
-            return base_payload
-
-        if not breakout_ok:
-            base_payload["reason"] = "aguardando_rompimento_canal"
-            base_payload.update(self._resolve_rule_meta(base_payload["reason"]))
-            base_payload["rule_trace"]["FIM-008"] = "bloqueado"
-            return base_payload
-
-        if not pullback_ok:
-            base_payload["reason"] = "aguardando_pullback"
-            base_payload.update(self._resolve_rule_meta(base_payload["reason"]))
-            base_payload["rule_trace"]["FIM-008"] = "bloqueado"
-            return base_payload
-
-        if require_sr_touch and not near_sr:
-            base_payload["reason"] = "longe_do_nivel_sr"
-            base_payload.update(self._resolve_rule_meta(base_payload["reason"]))
-            base_payload["rule_trace"]["FIM-008"] = "bloqueado"
-            return base_payload
-
-        base_payload["signal"] = candidate_signal
-        base_payload["reason"] = "setup_pronto"
-        base_payload.update(self._resolve_rule_meta(base_payload["reason"], signal=candidate_signal))
-        return base_payload
 
     def get_signal(self, current_price, levels, indicators=None):
         details = self.evaluate_signal_details(current_price, levels, indicators)
@@ -404,3 +335,4 @@ class SignalDetector:
             )
             return final_signal
         return None
+

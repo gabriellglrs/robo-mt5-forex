@@ -1,0 +1,10 @@
+{
+  "permission": {
+    "read": {
+      "C:/DEV/robo-mt5-v2/.opencode/get-shit-done/*": "allow"
+    },
+    "external_directory": {
+      "C:/DEV/robo-mt5-v2/.opencode/get-shit-done/*": "allow"
+    }
+  }
+}

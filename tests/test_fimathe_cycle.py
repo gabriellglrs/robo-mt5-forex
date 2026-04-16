@@ -53,16 +53,12 @@ def test_event_perdeu_50_buy():
     open_price = 1.1040
 
     state = None
-    # Reach 50% first.
-    for price in [1.1080, 1.1082]:
-        result = evaluate_fimathe_cycle_event("BUY", price, open_price, context, state, config, point)
-        state = result["state"]
-
-    # Cross back below 50% to trigger event.
-    result = evaluate_fimathe_cycle_event("BUY", 1.1070, open_price, context, state, config, point)
+    # Reaching 50% triggers the event immediately in the new proactive logic.
+    result = evaluate_fimathe_cycle_event("BUY", 1.1076, open_price, context, state, config, point)
     assert result["action"] is not None
     assert result["action"]["event"] == "perdeu_50"
     assert result["action"]["rule_id"] == "FIM-010"
+    assert result["state"]["moved_on_50"] is True
 
 
 def test_event_perdeu_100_buy():
@@ -72,14 +68,24 @@ def test_event_perdeu_100_buy():
     open_price = 1.1040
 
     state = None
-    # Reach 100% first.
-    for price in [1.1085, 1.1104]:
-        result = evaluate_fimathe_cycle_event("BUY", price, open_price, context, state, config, point)
-        state = result["state"]
-
-    # Cross back below 100% to trigger event.
-    result = evaluate_fimathe_cycle_event("BUY", 1.1095, open_price, context, state, config, point)
+    # Reach 100% (1.1100).
+    result = evaluate_fimathe_cycle_event("BUY", 1.1105, open_price, context, state, config, point)
     assert result["action"] is not None
     assert result["action"]["event"] == "perdeu_100"
-    assert result["action"]["rule_id"] == "FIM-010"
+    assert "100%" in result["action"]["note"]
+    assert result["state"]["moved_on_100"] is True
+
+
+if __name__ == "__main__":
+    try:
+        test_event_perdeu_topo_buy()
+        print("test_event_perdeu_topo_buy: OK")
+        test_event_perdeu_50_buy()
+        print("test_event_perdeu_50_buy: OK")
+        test_event_perdeu_100_buy()
+        print("test_event_perdeu_100_buy: OK")
+        print("\nAll tests passed successfully!")
+    except Exception as e:
+        print(f"Test failed: {e}")
+        sys.exit(1)
 

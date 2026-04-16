@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger("RoboMT5-Main")
 
 SETTINGS_FILE = "config/settings.json"
-MAX_SYMBOLS = 10
+MAX_SYMBOLS = 30
 STRATEGY_NAME = "fimathe"
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 FIMATHE_RUNTIME_FILE = os.path.join(PROJECT_ROOT, "logs", "fimathe_runtime.json")
@@ -610,9 +610,27 @@ def main():
 
         loop_counter = 0
         while True:
+            # Recarrega configurações para captar mudanças da UI (ex: running_state, risk_percent)
+            new_settings = load_settings()
+            if new_settings:
+                settings = new_settings
+
+            is_running = settings.get("running_state", False)
+
             if loop_counter % 60 == 0:
-                db_manager.log_event("INFO", "Heartbeat", "Robo operando normalmente.")
+                status_msg = "Robo operando normalmente." if is_running else "Robo em PAUSE (Aguardando Start na UI)."
+                db_manager.log_event("INFO", "Heartbeat", status_msg)
                 loop_counter = 0
+
+            if not is_running:
+                runtime_snapshot["status"] = "paused"
+                runtime_snapshot["updated_at"] = datetime.now().isoformat(timespec="seconds")
+                write_runtime_snapshot(runtime_snapshot)
+                time.sleep(2)
+                loop_counter += 1
+                continue
+            
+            runtime_snapshot["status"] = "running"
 
             for symbol, engine in engines.items():
                 try:
@@ -630,8 +648,23 @@ def main():
                         cycle_state_by_ticket=cycle_state_by_ticket,
                     )
 
+                    # Atualiza configurações dinâmicas no signal_detector e risk_manager
+                    signal_cfg_current = settings.get("signal_logic", {})
+                    engine["signal_detector"].settings = signal_cfg_current
+                    
+                    risk_cfg_current = settings.get("risk_management", {})
+                    engine["risk_manager"].config = risk_cfg_current
+                    engine["risk_manager"].settings = risk_cfg_current
+
                     current_price = tick.bid
-                    details = engine["signal_detector"].evaluate_signal_details(current_price, engine["levels"])
+                    signal_point = getattr(engine["signal_detector"], "point", 0.00001) or 0.00001
+                    current_spread = int((tick.ask - tick.bid) / float(signal_point)) if signal_point else 0
+                    
+                    details = engine["signal_detector"].evaluate_signal_details(
+                        current_price, 
+                        engine["levels"],
+                        current_spread=current_spread
+                    )
                     signal = details.get("signal")
 
                     order_engine = engine["order_engine"]
@@ -708,9 +741,17 @@ def main():
                         engine["levels"],
                         signal_details=details,
                     )
+                    # Usa lot do risk_manager (que deve ser atualizado se o settings mudou)
+                    # Nota: simplificando para esta fase de UX, o risk_manager usa o config estático do init.
+                    # TODO: Implementar RiskManager.update_config(risk_cfg)
+                    risk_cfg_current = settings.get("risk_management", {})
+                    engine["risk_manager"].config = risk_cfg_current # Atualização bruta para a fase de UX
+                    
                     lot = engine["risk_manager"].calculate_lot(abs(current_price - sl))
 
                     order_type = mt5.ORDER_TYPE_BUY if signal == "BUY" else mt5.ORDER_TYPE_SELL
+
+                    deviation = int(signal_cfg_current.get("max_slippage_points", 20))
 
                     result = order_engine.send_market_order(
                         symbol=symbol,
@@ -718,6 +759,7 @@ def main():
                         volume=lot,
                         sl=sl,
                         tp=tp,
+                        deviation=deviation,
                         timeframe=",".join(timeframes),
                         strategy=STRATEGY_NAME,
                         indicators=details,
