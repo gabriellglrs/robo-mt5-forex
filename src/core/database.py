@@ -1,19 +1,20 @@
-import mysql.connector
-from mysql.connector import pooling
-import json
+﻿import json
 import logging
 from datetime import datetime
 
+import mysql.connector
+
+
 class DatabaseManager:
-    """Gerencia a persistência de dados no MySQL para auditoria e dashboard."""
-    
+    """Gerencia persistencia de trades no MySQL."""
+
     def __init__(self, host="localhost", user="mt5_user", password="mt5_password", database="robo_trading_db"):
         self.logger = logging.getLogger("DatabaseManager")
         self.config = {
             "host": host,
             "user": user,
             "password": password,
-            "database": database
+            "database": database,
         }
         self.pool = None
         self._initialize_pool()
@@ -24,14 +25,14 @@ class DatabaseManager:
             self.pool = mysql.connector.pooling.MySQLConnectionPool(
                 pool_name="mt5_pool",
                 pool_size=5,
-                **self.config
+                **self.config,
             )
-            self.logger.info("Pool de conexões MySQL inicializado.")
-        except Exception as e:
-            self.logger.error(f"Erro ao conectar ao MySQL: {e}")
+            self.logger.info("Pool de conexoes MySQL inicializado.")
+        except Exception as exc:
+            self.logger.error(f"Erro ao conectar ao MySQL: {exc}")
 
     def _create_tables(self):
-        """Cria as tabelas de Trades e Logs se não existirem."""
+        """Cria tabela de trades caso nao exista."""
         trades_sql = """
         CREATE TABLE IF NOT EXISTS trades (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,59 +53,103 @@ class DatabaseManager:
             indicators_json JSON
         )
         """
-        logs_sql = """
-        CREATE TABLE IF NOT EXISTS system_logs (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            level VARCHAR(10),
-            module VARCHAR(50),
-            message TEXT
-        )
-        """
-        
+
         conn = self.pool.get_connection()
         cursor = conn.cursor()
         try:
             cursor.execute(trades_sql)
-            cursor.execute(logs_sql)
             conn.commit()
-            self.logger.info("Tabelas de banco de dados verificadas/criadas.")
+            self.logger.info("Tabela trades verificada/criada.")
         finally:
             cursor.close()
             conn.close()
 
     def save_trade_open(self, ticket, symbol, magic, trade_type, timeframe, strategy, price, sl, tp, indicators):
-        """Registra a abertura de uma nova posição."""
+        """Registra abertura de nova posicao."""
         sql = """
         INSERT INTO trades (ticket, symbol, magic, type, timeframe, strategy, entry_price, entry_time, sl, tp, indicators_json)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-        data = (ticket, symbol, magic, trade_type, timeframe, strategy, price, datetime.now(), sl, tp, json.dumps(indicators))
-        
+        data = (
+            ticket,
+            symbol,
+            magic,
+            trade_type,
+            timeframe,
+            strategy,
+            price,
+            datetime.now(),
+            sl,
+            tp,
+            json.dumps(indicators),
+        )
+
         conn = self.pool.get_connection()
         cursor = conn.cursor()
         try:
             cursor.execute(sql, data)
             conn.commit()
             self.logger.info(f"Trade #{ticket} registrado no banco de dados.")
-        except Exception as e:
-            self.logger.error(f"Erro ao salvar abertura de trade: {e}")
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar abertura de trade: {exc}")
         finally:
             cursor.close()
             conn.close()
 
-    def log_event(self, level, module, message):
-        """Registra um evento ou erro no banco para auditoria."""
-        sql = "INSERT INTO system_logs (level, module, message) VALUES (%s, %s, %s)"
-        data = (level, module, message)
-        
-        conn = self.pool.get_connection()
-        cursor = conn.cursor()
+    def get_trade_context(self, ticket):
+        """Retorna contexto tecnico do trade para gestao de risco dinamica."""
+        if self.pool is None:
+            return {}
+
+        sql = """
+        SELECT ticket, symbol, type, entry_price, sl, tp, indicators_json
+        FROM trades
+        WHERE ticket = %s
+        ORDER BY id DESC
+        LIMIT 1
+        """
+
+        conn = None
+        cursor = None
         try:
-            cursor.execute(sql, data)
-            conn.commit()
-        except Exception as e:
-            pass # Para não entrar em loop se o log falhar
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(sql, (int(ticket),))
+            row = cursor.fetchone()
+            if not row:
+                return {}
+
+            indicators_raw = row.get("indicators_json")
+            indicators = {}
+            if isinstance(indicators_raw, dict):
+                indicators = indicators_raw
+            elif isinstance(indicators_raw, str) and indicators_raw.strip():
+                try:
+                    indicators = json.loads(indicators_raw)
+                except Exception:
+                    indicators = {}
+
+            return {
+                "ticket": row.get("ticket"),
+                "symbol": row.get("symbol"),
+                "type": row.get("type"),
+                "entry_price": row.get("entry_price"),
+                "sl": row.get("sl"),
+                "tp": row.get("tp"),
+                "indicators": indicators if isinstance(indicators, dict) else {},
+            }
+        except Exception as exc:
+            self.logger.error(f"Erro ao buscar contexto do trade #{ticket}: {exc}")
+            return {}
         finally:
-            cursor.close()
-            conn.close()
+            try:
+                if cursor is not None:
+                    cursor.close()
+                if conn is not None:
+                    conn.close()
+            except Exception:
+                pass
+
+    def log_event(self, level, module, message):
+        """Desativado: nao grava mais system_logs."""
+        return
