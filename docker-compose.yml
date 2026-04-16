@@ -1,0 +1,24 @@
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: robo-mt5-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: robo_trading_db
+      MYSQL_USER: mt5_user
+      MYSQL_PASSWORD: mt5_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+
+  adminer:
+    image: adminer
+    container_name: robo-mt5-adminer
+    restart: always
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql_data:
