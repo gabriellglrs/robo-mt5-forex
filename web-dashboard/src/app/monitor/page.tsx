@@ -34,7 +34,8 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
   };
 
   return (
-    <div className={`glass p-6 rounded-[32px] border border-white/5 flex flex-col gap-6 hover:border-white/20 transition-all duration-500 ${getGlowColor(asset.status_phase)}`}>
+    <div className={`glass p-8 rounded-[40px] border border-white/5 flex flex-col gap-8 hover:border-white/10 transition-all duration-500 ${getGlowColor(asset.status_phase)} relative overflow-hidden`}>
+      <div className={`absolute top-0 right-0 w-32 h-32 blur-[80px] -mr-16 -mt-16 opacity-5 ${asset.trend_direction === 'BUY' ? 'bg-primary' : 'bg-red-500'}`} />
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center font-bold text-lg text-white">
@@ -52,7 +53,9 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
         </div>
         <div className="text-right">
           <p className="text-[10px] text-gray-500 font-mono">Price</p>
-          <p className="text-xl font-mono font-bold text-white leading-none">{asset.price.toFixed(5)}</p>
+          <p className="text-xl font-mono font-bold text-white leading-none">
+            {asset.price !== undefined && asset.price !== null ? asset.price.toFixed(5) : '0.00000'}
+          </p>
         </div>
       </div>
 
@@ -71,7 +74,9 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
               <span className={`text-xs font-bold ${asset.trend_direction === 'BUY' ? 'text-primary' : 'text-red-500'}`}>
                 {asset.trend_direction || 'LATERAL'}
               </span>
-              <span className="text-[10px] font-mono text-gray-400">{asset.trend_slope_points?.toFixed(2)} pts</span>
+              <span className="text-[10px] font-mono text-gray-400">
+                {asset.trend_slope_points !== undefined && asset.trend_slope_points !== null ? asset.trend_slope_points.toFixed(2) : '0.00'} pts
+              </span>
             </div>
           </div>
           <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
@@ -88,7 +93,9 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
           <div className="space-y-1.5">
              <div className="flex justify-between items-center text-[10px]">
                 <span className="text-gray-500">Ponto A / B</span>
-                <span className="text-white font-mono">{asset.point_a?.toFixed(5)} / {asset.point_b?.toFixed(5)}</span>
+                <span className="text-white font-mono">
+                    {asset.point_a !== undefined && asset.point_a !== null ? asset.point_a.toFixed(5) : '0.00000'} / {asset.point_b !== undefined && asset.point_b !== null ? asset.point_b.toFixed(5) : '0.00000'}
+                </span>
              </div>
              <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden flex">
                 <div 
@@ -102,7 +109,9 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
              </div>
              <div className="flex justify-between items-center text-[10px]">
                 <span className="text-gray-500">Projeção 80 / 100</span>
-                <span className="text-white font-mono">{asset.projection_80?.toFixed(5)} / {asset.projection_100?.toFixed(5)}</span>
+                <span className="text-white font-mono">
+                    {asset.projection_80 !== undefined && asset.projection_80 !== null ? asset.projection_80.toFixed(5) : '0.00000'} / {asset.projection_100 !== undefined && asset.projection_100 !== null ? asset.projection_100.toFixed(5) : '0.00000'}
+                </span>
              </div>
           </div>
         </div>
@@ -148,15 +157,26 @@ export default function MonitorPage() {
   const assets = snapshot?.symbols ? Object.values(snapshot.symbols) : [];
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
-      <div className="flex justify-between items-end">
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight text-glow-primary">Monitor Fimathe</h1>
-          <p className="text-gray-400 text-sm mt-1">Acompanhamento multi-ativo das fases da estratégia em tempo real.</p>
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-5 h-5 text-primary animate-pulse" />
+            <span className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Telemetria em Tempo Real</span>
+          </div>
+          <h1 className="text-4xl font-black text-white tracking-tighter">MONITOR DE <span className="text-primary">EXECUÇÃO</span></h1>
+          <p className="text-gray-500 text-sm mt-1 max-w-md">Acompanhamento multi-ativo das fases da estratégia Fimathe, monitorando gatilhos e agrupamentos em nanosegundos.</p>
         </div>
-        <div className="glass px-4 py-2 rounded-full border border-white/5 flex items-center gap-2">
-          <RefreshCcw className="w-3 h-3 text-primary animate-spin" style={{ animationDuration: '4s' }} />
-          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Atualizado: {snapshot?.updated_at ? new Date(snapshot.updated_at).toLocaleTimeString() : '--:--:--'}</span>
+        
+        <div className="glass px-5 py-2.5 rounded-2xl border border-white/5 flex items-center gap-4">
+          <div className="p-2 rounded-xl bg-primary/10">
+            <RefreshCcw className="w-4 h-4 text-primary animate-spin" style={{ animationDuration: '4s' }} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Sincronizado</span>
+            <span className="text-[11px] font-mono text-white font-bold leading-tight">{snapshot?.updated_at ? new Date(snapshot.updated_at).toLocaleTimeString() : '--:--:--'}</span>
+          </div>
         </div>
       </div>
 
@@ -175,10 +195,16 @@ export default function MonitorPage() {
       )}
 
       {snapshot?.recent_events && snapshot.recent_events.length > 0 && (
-         <div className="glass p-8 rounded-[40px] border border-white/5">
-            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-               <Zap className="w-5 h-5 text-primary" /> Fluxo de Eventos Recentes
-            </h3>
+         <div className="glass p-10 rounded-[48px] border border-white/5 overflow-hidden">
+            <div className="mb-8">
+              <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-3">
+                 <div className="p-2 rounded-lg bg-primary/10">
+                   <Zap className="w-5 h-5 text-primary" />
+                 </div>
+                 Fluxo de Eventos Recentes
+              </h3>
+              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-2 ml-14">Atividade sistêmica em tempo real</p>
+            </div>
             <div className="space-y-3">
                {snapshot.recent_events.slice(-5).reverse().map((event, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">

@@ -24,21 +24,24 @@ import { Metrics, Trade } from '@/types';
 
 function StatsCard({ title, value, subValue, icon: Icon, color }: any) {
   return (
-    <div className="glass p-6 rounded-3xl relative overflow-hidden group hover:border-primary/30 transition-all duration-500">
-      <div className={`absolute top-0 right-0 w-24 h-24 blur-3xl -mr-8 -mt-8 opacity-20 bg-${color}`} />
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-3 rounded-2xl bg-${color}/10 border border-${color}/20 text-${color}`}>
-          <Icon className="w-6 h-6" />
+    <div className="glass p-8 rounded-[40px] relative overflow-hidden group hover:border-white/10 transition-all duration-500">
+      <div className={`absolute top-0 right-0 w-32 h-32 blur-[80px] -mr-16 -mt-16 opacity-10 bg-${color}`} />
+      
+      <div className="flex justify-between items-start mb-6">
+        <div className={`p-4 rounded-2xl bg-${color}/10 border border-${color}/20 text-${color} relative overflow-hidden group-hover:scale-110 transition-transform duration-500`}>
+          <Icon className="w-6 h-6 relative z-10" />
+          <div className={`absolute inset-0 bg-${color}/20 opacity-0 group-hover:opacity-100 transition-opacity`} />
         </div>
-        <div className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full uppercase tracking-tighter">
-          <ArrowUpRight className="w-3 h-3" />
+        <div className="flex items-center gap-1.5 text-[9px] font-black text-primary bg-primary/10 px-3 py-1.5 rounded-full uppercase tracking-widest border border-primary/20">
+          <div className="w-1 h-1 rounded-full bg-primary animate-ping" />
           Live
         </div>
       </div>
-      <div>
-        <p className="text-gray-400 text-xs font-medium mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-white tracking-tight">{value}</h3>
-        <p className="text-[10px] text-gray-500 mt-1 font-mono">{subValue}</p>
+      
+      <div className="relative z-10">
+        <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">{title}</p>
+        <h3 className="text-3xl font-black text-white tracking-tighter mb-1">{value}</h3>
+        <p className="text-[10px] text-gray-500 font-medium leading-relaxed">{subValue}</p>
       </div>
     </div>
   );
@@ -81,23 +84,35 @@ export default function DashboardPage() {
     }, []) || [];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">Performance</h1>
-        <p className="text-gray-400 text-sm mt-1">Visão geral do capital e eficiência operacional.</p>
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <BarChart3 className="w-5 h-5 text-primary animate-pulse" />
+            <span className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Painel de Performance</span>
+          </div>
+          <h1 className="text-4xl font-black text-white tracking-tighter">ESTATÍSTICAS DO <span className="text-primary">ALGORITMO</span></h1>
+          <p className="text-gray-500 text-sm mt-1 max-w-md">Visão geral do capital, taxa de acerto e eficiência operacional da estratégia Fimathe em tempo real.</p>
+        </div>
+        
+        <div className="glass px-5 py-2.5 rounded-2xl border border-white/5 flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse glow-primary" />
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Motor Operacional Conectado</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard 
           title="Saldo em Lucro" 
-          value={`$ ${metrics?.pnl.toFixed(2) || '0.00'}`} 
+          value={`$ ${metrics?.pnl !== undefined && metrics?.pnl !== null ? metrics.pnl.toFixed(2) : '0.00'}`} 
           subValue="Lucro líquido total disparado" 
           icon={DollarSign} 
           color="primary"
         />
         <StatsCard 
           title="Taxa de Acerto" 
-          value={`${metrics?.win_rate.toFixed(1) || '0'}%`} 
+          value={`${metrics?.win_rate !== undefined && metrics?.win_rate !== null ? metrics.win_rate.toFixed(1) : '0'}%`} 
           subValue="Consistência baseada na estratégia" 
           icon={Target} 
           color="secondary"
@@ -119,14 +134,17 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 glass p-8 rounded-[40px] border border-white/5">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-lg font-bold text-white">Curva de Equity</h3>
+        <div className="lg:col-span-2 glass p-10 rounded-[48px] border border-white/5 overflow-hidden">
+          <div className="flex justify-between items-center mb-10">
+            <div>
+              <h3 className="text-xl font-bold text-white tracking-tight">Curva de Equity</h3>
+              <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">Evolução do Saldo Projetado</p>
+            </div>
             <div className="flex gap-2">
-              <span className="px-3 py-1 rounded-full bg-white/5 text-[10px] text-gray-400 font-bold border border-white/10 uppercase">Últimos Trades</span>
+              <span className="px-4 py-1.5 rounded-full bg-white/5 text-[9px] text-gray-400 font-black border border-white/5 uppercase tracking-tighter">Histórico de Ordens</span>
             </div>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
@@ -156,9 +174,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="glass p-8 rounded-[40px] border border-white/5 flex flex-col">
-          <h3 className="text-lg font-bold text-white mb-6">Últimos Trades</h3>
-          <div className="space-y-4 flex-1 overflow-y-auto pr-2 max-h-[350px]">
+        <div className="glass p-10 rounded-[48px] border border-white/5 flex flex-col">
+          <div className="mb-8">
+            <h3 className="text-xl font-bold text-white tracking-tight">Fluxo Recente</h3>
+            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">Últimas Execuções</p>
+          </div>
+          <div className="space-y-4 flex-1 overflow-y-auto pr-2 max-h-[400px] custom-scrollbar">
             {metrics?.recent_trades.map((trade: Trade) => (
               <div key={trade.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
                 <div className="flex items-center gap-3">
@@ -172,7 +193,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-right">
                   <p className={`text-xs font-bold ${trade.pnl >= 0 ? 'text-primary' : 'text-red-500'}`}>
-                    {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
+                    {trade.pnl >= 0 ? '+' : ''}{trade.pnl !== undefined && trade.pnl !== null ? trade.pnl.toFixed(2) : '0.00'}
                   </p>
                   <p className="text-[9px] text-gray-600 uppercase font-bold">{trade.strategy}</p>
                 </div>
