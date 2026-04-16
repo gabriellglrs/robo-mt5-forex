@@ -1,0 +1,43 @@
+{
+    "analysis": {
+        "history_years": 10,
+        "n_clusters": 20,
+        "wick_sensitivity": 0.3,
+        "strategy_mode": "statistical",
+        "timeframes": [
+            "M5"
+        ],
+        "mtf_confluence": true
+    },
+    "signal_logic": {
+        "mode": "MIN_COUNT",
+        "min_confirmations": 3,
+        "filters": {
+            "bollinger": true,
+            "rsi": true,
+            "pinbar": true,
+            "stochastic": true,
+            "volume": false
+        }
+    },
+    "risk_management": {
+        "lot_mode": "fixed",
+        "fixed_lot": 0.01,
+        "risk_percentage": 1.0,
+        "sl_tp_mode": "fixed",
+        "sl_points": 300,
+        "tp_points": 600,
+        "max_open_positions": 1,
+        "magic_number": 202404,
+        "use_breakeven": false
+    },
+    "connection": {
+        "path": "",
+        "login": 0,
+        "password": "",
+        "server": ""
+    },
+    "ui_settings": {
+        "refresh_rate_seconds": 5
+    }
+}
