@@ -69,15 +69,29 @@
 3. Fluxo runtime apresenta explicacao clara para entradas, bloqueios e ajustes de risco.
 4. Hot-reload de ativos permite mudar o monitoramento sem reiniciar o robô.
 
-### Phase 11: Homologação e Testes de Funcionalidade Fimathe (Compliance com Manual)
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 10
-**Plans:** 0 plans
+### Phase 12: Monitor de Execução Advanced UI/UX
+**Goal**: Transformar o monitor técnico em um dashboard premium com indicadores visuais, coloração semântica e rastreio explícito das regras Fimathe.
+**Depends on**: Phase 10
+**Success Criteria**:
+1. Coloração semântica baseada na fase operacional (Monitoramento, Entrada, Risco).
+2. Card de Tendência com timeframe e ajuda didática para "pts".
+3. Simulação visual da estrutura técnica (Price vs Levels) em tempo real.
+4. Seção de Auditoria de Regras explicitando bloqueios/gatilhos (FIM-001..FIM-014).
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 11 to break down)
+- [x] TBD (run /gsd-plan-phase 12 to break down)
+
+### Phase 13: Financial Transparency & Profit Monitoring
+**Goal**: Implementar monitoramento financeiro em tempo real com exibição de saldo, equidade e lucro flutuante (PnL) por ativo no dashboard.
+**Depends on**: Phase 12
+**Success Criteria**:
+1. Informações da conta (Saldo, Lucro Aberto) exibidas no cabeçalho do monitor.
+2. Cada card de ativo exibe seu lucro/prejuízo flutuante atual com coloração semântica.
+3. Dados financeiros integrados ao snapshot de runtime gerado pelo robô.
+4. Rebuild da infraestrutura Docker para suportar as mudanças de UI.
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 13 to break down)
 
 ---
-**Status Atual**: Fase 10 CONCLUÍDA. Iniciando FASE 11 (Homologação e Testes de Stress).
+**Status Atual**: Fase 12 CONCLUÍDA. Monitor de Execução Premium operando com visualizador de níveis e hover cards.

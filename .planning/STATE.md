@@ -26,6 +26,8 @@ Projeto com Phase 8 finalizada. O motor de decisão Fimathe foi desacoplado para
 - [x] Phase 9: Gestao de risco Fimathe
 - [x] Phase 10: UX/configuracoes completas
 - [x] Phase 11: Homologação e Testes (Compliance Manual)
+- [x] Phase 12: Monitor de Execução Advanced UI/UX
+- [x] Phase 13: Transparência Financeira (Profit Monitoring)
 
 ## Entregas fechadas na Phase 7
 - SPEC e Gap Analysis consolidados.
@@ -43,6 +45,16 @@ Projeto com Phase 8 finalizada. O motor de decisão Fimathe foi desacoplado para
 - **Stop Técnico Fimathe (STI)**: Posicionamento automático com base na Zona Neutra.
 - **Trailing Stop Proativo**: Gatilhos automáticos para Break-even (50%) e Trava de Lucro (100%).
 - **Suite de Testes de Risco**: Validação de gatilhos proativos em `tests/test_fimathe_cycle.py`.
+
+## Entregas fechadas na Phase 13
+- **Snapshot Financeiro**: Injeção de `Balance`, `Equity` e `Profit` global no runtime snapshot.
+- **PnL por Ativo**: Rastreamento individual de lucro/prejuízo flutuante por símbolo.
+- **Dashboard Financeiro**: Cabeçalho global com widgets neon para acompanhamento de capital.
+- **Micro-indicadores**: Lucro em tempo real adicionado aos cards de monitoramento com coloração semântica (Premium).
+- **Coloração Semântica**: Cards com brilho (glow) e cores dinâmicas por fase (Monitoramento, Rompimento, Entrada, Risco).
+- **Régua de Níveis**: Novo componente `FimatheStructureGauge` para visualização gráfica da posição do preço em relação aos níveis A/B e alvos.
+- **Interatividade**: Tooltips (hover cards) ricos para `pts` e regras de execução via `rule_trace`.
+- **Transparência**: Exibição explícita do `rule_id` e `next_trigger` no monitor em tempo real.
 
 ## Validacao comportamental
 - Máquina de estados desacoplada com transições explícitas.

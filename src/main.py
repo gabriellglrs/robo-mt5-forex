@@ -219,7 +219,7 @@ def append_runtime_event(runtime_snapshot, symbol, message, level="INFO"):
         del events[:-80]
 
 
-def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, max_pos, point, breakout_buffer_points, trailing_summary):
+def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, max_pos, point, breakout_buffer_points, trailing_summary, current_pnl=0.0):
     reason = details.get("reason")
     signal = details.get("signal")
     trend_direction = details.get("trend_direction")
@@ -335,6 +335,7 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
         "sr_tolerance_points": _safe_round(details.get("sr_tolerance_points"), 2),
         "open_positions": int(open_count),
         "max_open_positions": int(max_pos),
+        "current_pnl": _safe_round(current_pnl, 2),
         "trailing_updates": trailing_updates,
         "trailing_actions": trailing_summary.get("actions", []),
         "last_cycle_action": last_cycle_action,
@@ -649,6 +650,21 @@ def main():
             
             runtime_snapshot["status"] = "running"
 
+            # Coleta de dados financeiros globais e por símbolo
+            acc_info = mt5.account_info()
+            if acc_info:
+                runtime_snapshot["account"] = {
+                    "balance": acc_info.balance,
+                    "equity": acc_info.equity,
+                    "profit": acc_info.profit,
+                }
+            
+            pnl_by_symbol = {}
+            all_positions = mt5.positions_get()
+            if all_positions:
+                for pos in all_positions:
+                    pnl_by_symbol[pos.symbol] = pnl_by_symbol.get(pos.symbol, 0.0) + pos.profit
+
             for symbol, engine in engines.items():
                 try:
                     tick = mt5.symbol_info_tick(symbol)
@@ -707,6 +723,7 @@ def main():
                         point=float(signal_point),
                         breakout_buffer_points=breakout_buffer_points,
                         trailing_summary=trailing_summary,
+                        current_pnl=pnl_by_symbol.get(symbol, 0.0),
                     )
                     previous_reason = runtime_snapshot["symbols"].get(symbol, {}).get("reason")
                     runtime_snapshot["symbols"][symbol] = symbol_snapshot

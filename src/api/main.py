@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import mysql.connector
+import threading
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -266,6 +267,49 @@ def get_logs(limit: int = 100, user: str = Depends(get_current_user)):
         return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/logs")
+def clear_logs(user: str = Depends(get_current_user)):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM system_logs")
+        conn.commit()
+        conn.close()
+        return {"message": "Banco de dados de logs limpo com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def background_log_cleaner():
+    """Tarefa de segundo plano para limpar logs antigos automaticamente."""
+    while True:
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+                
+                # O intervalo de limpeza fica em ui_settings para facilitar a edicao na UI
+                cleanup_minutes = settings.get("ui_settings", {}).get("log_cleanup_minutes", 0)
+                
+                if cleanup_minutes > 0:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    # Deleta logs anteriores ao intervalo definido
+                    cursor.execute(
+                        "DELETE FROM system_logs WHERE timestamp < NOW() - INTERVAL %s MINUTE",
+                        (cleanup_minutes,)
+                    )
+                    if cursor.rowcount > 0:
+                        print(f"[{datetime.now()}] Auto-cleanup: {cursor.rowcount} logs removidos.")
+                    conn.commit()
+                    conn.close()
+        except Exception as e:
+            print(f"Erro no background cleaner: {e}")
+        
+        time.sleep(60) # Verifica a cada minuto
+
+# Inicia a thread de limpeza automatica
+threading.Thread(target=background_log_cleaner, daemon=True).start()
 
 if __name__ == "__main__":
     import uvicorn
