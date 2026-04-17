@@ -18,6 +18,68 @@ import {
   Zap
 } from 'lucide-react';
 import { RuntimeSnapshot, FimatheAsset } from '@/types';
+import { motion } from 'framer-motion';
+
+const RULE_METADATA: Record<string, { name: string; desc: string }> = {
+  'FIM-001': { name: 'Coleta de Dados', desc: 'Conexão e Histórico de Candles' },
+  'FIM-002': { name: 'Tendência Principal', desc: 'Direção do timeframe maior' },
+  'FIM-003': { name: 'Canais A/B', desc: 'Cálculo de Referência e Zona Neutra' },
+  'FIM-004': { name: 'Sincronia Temporal', desc: 'Alinhamento H1/M15/M1' },
+  'FIM-005': { name: 'Região Negociável', desc: 'Preço em zona de gatilho' },
+  'FIM-006': { name: 'Filtro de Agrupamento', desc: 'Consolidação no M1' },
+  'FIM-007': { name: 'Rompimento Canal', desc: 'Fechamento fora da borda' },
+  'FIM-008': { name: 'Regra Anti-Achômetro', desc: 'Suporte/Resistência Histórico' },
+  'FIM-009': { name: 'Filtro de Spread', desc: 'Custo da corretora' },
+  'FIM-010': { name: 'Ciclo de Proteção', desc: 'Trailing Stop nos 50%' },
+  'FIM-011': { name: 'Reteste (Pullback)', desc: 'Confirmação após rompimento' },
+  'FIM-012': { name: 'Limite de Risco', desc: 'Trava financeira de 3%' },
+  'FIM-013': { name: 'Gestão de Alvos', desc: 'Projeção dinâmica de saída' },
+  'FIM-014': { name: 'Auditoria de Estado', desc: 'Rastreabilidade total' },
+  'FIM-015': { name: 'Reversão Rigorosa', desc: '2 níveis + triângulo' },
+  'FIM-016': { name: 'Tendência Estrutural', desc: 'Topos/Fundos técnicos' },
+};
+
+function RuleTraceMatrix({ trace }: { trace?: Record<string, string> }) {
+  const rules = Array.from({ length: 16 }, (_, i) => {
+    const id = `FIM-${(i + 1).toString().padStart(3, '0')}`;
+    const status = trace?.[id] || 'pendente';
+    return { id, status };
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ok': return 'bg-primary border-primary shadow-[0_0_8px_rgba(0,255,170,0.4)]';
+      case 'bloqueado': return 'bg-red-500 border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]';
+      case 'desativado': return 'bg-gray-700 border-gray-600 opacity-40';
+      default: return 'bg-amber-400/40 border-amber-400/20'; // pendente
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-8 gap-1.5 p-3 bg-white/5 rounded-2xl border border-white/5 mt-2">
+      {rules.map((rule) => (
+        <div key={rule.id} className="group relative">
+          <div className={`w-2.5 h-2.5 rounded-full border transition-all duration-500 ${getStatusColor(rule.status)}`} />
+          
+          {/* Tooltip */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-2.5 rounded-xl bg-slate-900 border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[8px] font-black text-white/40 uppercase">{rule.id}</span>
+              <span className={`text-[7px] font-black uppercase px-1 rounded ${
+                rule.status === 'ok' ? 'bg-primary/20 text-primary' : 
+                rule.status === 'bloqueado' ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-gray-400'
+              }`}>
+                {rule.status}
+              </span>
+            </div>
+            <p className="text-[9px] font-bold text-white leading-tight mb-0.5">{RULE_METADATA[rule.id]?.name}</p>
+            <p className="text-[8px] text-gray-500 leading-relaxed italic">{RULE_METADATA[rule.id]?.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
   const getPhaseStyles = (phase: string) => {
@@ -252,47 +314,30 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
           <FimatheStructureGauge />
         </div>
 
-        <div className="space-y-3 pt-2">
-          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter mb-2">Checklist de Execução</p>
-          <div className="flex flex-wrap gap-2">
-             <div className={`flex-1 p-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all group relative ${asset.breakout_ok ? 'bg-primary/10 border-primary/30 text-primary shadow-[0_0_10px_rgba(0,255,170,0.1)]' : 'bg-white/5 border-white/10 text-gray-600'}`}>
-                {asset.breakout_ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                <span className="text-[9px] font-black uppercase tracking-widest">Rompimento</span>
-                
-                {/* Tooltip Detalhado se disponivel */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 rounded-xl bg-slate-900 border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50">
-                   <p className="text-[9px] font-bold text-white mb-2 uppercase tracking-widest flex items-center gap-1.5">
-                      <Target className="w-3 h-3" /> Critério Técnico
-                   </p>
-                   <p className="text-[10px] text-gray-400 leading-relaxed italic">
-                      {asset.breakout_ok 
-                        ? "O preço rompeu o canal de referência com volume e buffer técnico validado." 
-                        : "Aguardando o fechamento de um candle acima/abaixo dos níveis de controle."}
-                   </p>
-                </div>
-             </div>
-             <div className={`flex-1 p-2 rounded-xl flex items-center justify-center gap-1.5 border transition-all group relative ${asset.grouping_ok ? 'bg-primary/10 border-primary/30 text-primary shadow-[0_0_10px_rgba(0,255,170,0.1)]' : 'bg-white/5 border-white/10 text-gray-600'}`}>
-                {asset.grouping_ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                <span className="text-[9px] font-black uppercase tracking-widest">Agrupamento</span>
-
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 rounded-xl bg-slate-900 border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50">
-                   <p className="text-[9px] font-bold text-white mb-2 uppercase tracking-widest flex items-center gap-1.5">
-                      <Layers className="w-3 h-3" /> Micro-Estrutura
-                   </p>
-                   <p className="text-[10px] text-gray-400 leading-relaxed italic">
-                      {asset.grouping_ok 
-                        ? `Consolidação no M1 estável. Range: ${asset.grouping_range_points?.toFixed(1) || '--'} pts.` 
-                        : "Aguardando diminuição da volatilidade para confirmar zona de entrada."}
-                   </p>
-                </div>
-             </div>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter flex items-center gap-1.5">
+              <Layers className="w-3 h-3" /> Matriz de Auditoria (16 Regras)
+            </p>
+            <div className="flex items-center gap-3">
+               <div className="flex items-center gap-1">
+                 <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                 <span className="text-[8px] text-gray-600 font-bold">OK</span>
+               </div>
+               <div className="flex items-center gap-1">
+                 <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                 <span className="text-[8px] text-gray-600 font-bold">BLOCK</span>
+               </div>
+            </div>
           </div>
+          
+          <RuleTraceMatrix trace={asset.rule_trace} />
 
           {asset.next_trigger && (
             <div className="bg-primary/5 border border-primary/10 p-3 rounded-xl mt-2 flex items-start gap-2 animate-pulse">
                <Zap className="w-3 h-3 text-primary mt-0.5" />
                <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest">Próximo Gatilho</span>
+                  <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest">Ação Corretiva / Gatilho</span>
                   <p className="text-[10px] text-primary/90 font-medium leading-tight">{asset.next_trigger}</p>
                </div>
             </div>
