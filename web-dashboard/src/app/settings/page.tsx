@@ -359,6 +359,34 @@ export default function SettingsPage() {
     });
   };
 
+  const applyManagementStrategy = (mode: string) => {
+    setSettings((prev: any) => {
+      const risk = { 
+        ...prev.risk_management, 
+        fimathe_management_mode: mode, 
+        fimathe_cycle_enabled: true 
+      };
+      
+      // Presets recomendados baseado no modo
+      if (mode === 'standard') {
+        risk.fimathe_be_trigger_percent = 50;
+      } else if (mode === 'conservative') {
+        risk.fimathe_be_trigger_percent = 50;
+      } else if (mode === 'infinity') {
+        risk.fimathe_be_trigger_percent = 50;
+        risk.fimathe_trail_step_percent = 100;
+      }
+      
+      return { ...prev, risk_management: risk };
+    });
+    
+    setNotification({ 
+      message: `ESTRATÉGIA ATUALIZADA: Modo ${mode.toUpperCase()} configurado com presets oficiais.`, 
+      type: 'success' 
+    });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center p-20">
       <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -773,6 +801,53 @@ export default function SettingsPage() {
               <div>
                 <h3 className="text-xl font-bold text-white tracking-tight">Gestão de Exposição e Risco</h3>
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Proteção do capital e limites</p>
+              </div>
+            </div>
+
+            {/* SELETOR RÁPIDO DE ESTRATÉGIA */}
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-[0.2em] flex items-center gap-2">
+                 Seleção Rápida de Estratégia
+                 <span className="text-[8px] bg-white/5 px-2 py-0.5 rounded text-gray-600 font-black">PRESETS OFICIAIS</span>
+              </label>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { id: 'standard', name: 'Padrão (FIM-010)', desc: 'BE aos 50%', icon: ShieldCheck, color: 'text-gray-400' },
+                  { id: 'conservative', name: 'Conservador', desc: 'FIM-017 (B.E Fixo)', icon: Shield, color: 'text-primary' },
+                  { id: 'infinity', name: 'Infinity', desc: 'FIM-018 (Arraste)', icon: Zap, color: 'text-accent' }
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => applyManagementStrategy(mode.id)}
+                    className={`glass p-6 rounded-[32px] border transition-all text-left group relative overflow-hidden ` + (
+                      settings.risk_management?.fimathe_management_mode === mode.id
+                        ? 'border-primary/50 bg-primary/5'
+                        : 'border-white/5 hover:border-primary/20 hover:bg-white/[0.02]'
+                    )}
+                  >
+                    {settings.risk_management?.fimathe_management_mode === mode.id && (
+                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary/10 blur-3xl rounded-full" />
+                    )}
+                    
+                    <div className={`p-3 rounded-2xl w-fit mb-4 transition-all ` + (
+                      settings.risk_management?.fimathe_management_mode === mode.id 
+                        ? 'bg-primary/20 ' + mode.color 
+                        : 'bg-white/5 text-gray-500'
+                    )}>
+                      <mode.icon className="w-5 h-5" />
+                    </div>
+                    
+                    <h4 className={`text-xs font-black uppercase tracking-tighter mb-1 ` + (
+                      settings.risk_management?.fimathe_management_mode === mode.id ? 'text-white' : 'text-gray-400'
+                    )}>
+                      {mode.name}
+                    </h4>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-none">
+                      {mode.desc}
+                    </p>
+                  </button>
+                ))}
               </div>
             </div>
 
