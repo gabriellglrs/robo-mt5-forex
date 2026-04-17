@@ -94,18 +94,24 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const chartData = metrics?.recent_trades
-    .slice()
-    .reverse()
-    .reduce((acc: any[], trade, idx) => {
-      const prevPnl = acc.length > 0 ? acc[acc.length - 1].pnl : 0;
-      acc.push({
-        name: idx,
-        pnl: prevPnl + trade.pnl,
-        date: new Date(trade.entry_time).toLocaleDateString()
-      });
-      return acc;
-    }, []) || [];
+  const chartData = [
+    { name: 'Início', pnl: 0, date: '' },
+    ...(metrics?.recent_trades
+      ? metrics.recent_trades
+          .filter(t => t.status === 'CLOSED')
+          .slice()
+          .reverse()
+          .reduce((acc: any[], trade, idx) => {
+            const prevPnl = acc.length > 0 ? acc[acc.length - 1].pnl : 0;
+            acc.push({
+              name: idx + 1,
+              pnl: Number((prevPnl + (trade.pnl || 0)).toFixed(2)),
+              date: new Date(trade.exit_time || trade.entry_time).toLocaleDateString()
+            });
+            return acc;
+          }, [])
+      : [])
+  ];
 
   const openTrades = metrics?.recent_trades.filter(t => t.status === 'OPEN') || [];
   const closedTrades = metrics?.recent_trades.filter(t => t.status === 'CLOSED') || [];
