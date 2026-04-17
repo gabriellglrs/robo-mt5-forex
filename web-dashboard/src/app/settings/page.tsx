@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { RuleTooltip } from '@/components/RuleTooltip';
+import { InfoTooltip } from '@/components/InfoTooltip';
 
 const POPULAR_SYMBOLS = [
   "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", // Majors
@@ -212,6 +213,38 @@ const TRADING_PROFILES: Record<string, { name: string, trend: string, entry: str
   day_trader: { name: 'Day Trader (H1/M15)', trend: 'H1', entry: 'M15', color: 'text-green-400' },
   position_trader: { name: 'Position Trader (H4/H1)', trend: 'H4', entry: 'H1', color: 'text-yellow-400' },
   swing_trader: { name: 'Swing Trader (D1/H4)', trend: 'D1', entry: 'H4', color: 'text-purple-400' },
+};
+
+const SETTINGS_HELP = {
+  // Analysis
+  history_years: { title: "Lookback Histórico", content: "Define quantos anos de dados o robô analisa. Mais dados ajudam a identificar suportes históricos, mas aumentam o processamento." },
+  wick_sensitivity: { title: "Sensibilidade ao Pavio", content: "Controla quão rigoroso o robô é ao considerar pontas de pavios fora do canal principal na marcação técnica." },
+  trend_candles: { title: "Velas de Tendência", content: "Quantidade de velas recentes observadas para definir a direção principal e inclinação dos canais Fimathe." },
+  
+  // Signal Logic
+  trading_type: { title: "Perfil de Operação", content: "Presets otimizados da Fimathe. Configura automaticamente os tempos gráficos ideais para cada estilo operacional." },
+  trend_timeframe: { title: "Timeframe Tendência", content: "O gráfico de tempo maior usado para a 'Tendência de Referência'. É a direção primária que o robô segue." },
+  entry_timeframe: { title: "Timeframe Entrada", content: "Gráfico menor usado para achar o gatilho. Onde os rompimentos e agrupamentos são validados antes da ordem." },
+  breakout_buffer: { title: "Breakout Buffer", content: "Filtro de segurança (em pontos). O preço deve romper a linha por esta distância para evitar sinais falsos (violinos)." },
+  slope_min: { title: "Inclinação Mínima", content: "Impede o robô de operar em mercados laterais ou com tendências fracas demais para serem confiáveis." },
+  sr_tolerance: { title: "Tolerância S/R", content: "Margem de erro (em pontos) para validar o toque em níveis históricos de Suporte e Resistência." },
+  require_grouping: { title: "Exigir Agrupamento", content: "Obrigatório na Fimathe Purista: o preço deve consolidar antes de romper o canal para validar a entrada." },
+  target_level: { title: "Modo Take Profit", content: "Seu alvo de lucro. 80-85% são alvos conservadores (pré-briga); 100% busca a expansão técnica completa." },
+  max_spread: { title: "Spread Máximo", content: "Filtro de custo. Bloqueia entradas se a corretora estiver cobrando uma taxa (spread) maior que o definido aqui." },
+
+  // Risk
+  risk_percent: { title: "Risco por Trade", content: "Porcentagem do saldo que você aceita perder por operação. O lote é calculado automaticamente via Fimathe." },
+  max_positions: { title: "Limite de Posições", content: "Máximo de operações abertas ao mesmo tempo em ativos diferentes para controlar sua exposição total." },
+  magic_number: { title: "Magic Number", content: "Identificador único das ordens deste robô. Evita que o robô interfira em operações que você abriu manualmente." },
+  cooldown: { title: "Tempo de Espera", content: "Intervalo obrigatório entre fechar uma ordem e abrir outra no mesmo ativo, evitando o overtrading emocional." },
+  fimathe_cycle: { title: "Ciclo Fimathe", content: "Gestão dinâmica: Stop no 0x0 ao atingir 50% de lucro, e trava 50% de lucro ao bater 100% do alvo." },
+  
+  // Connection
+  server: { title: "Servidor MT5", content: "O nome exato do servidor da sua corretora (ex: Alpari-MT5-Demo) para conexão do motor Python." },
+  login: { title: "Login ID", content: "O número da sua conta de negociação no MetaTrader 5." },
+  
+  // Misc
+  triangle_m1: { title: "Triângulo M1", content: "Quantidade de velas no M1 para validar a consolidação (triângulo) antes de uma entrada ou reversão." },
 };
 
 export default function SettingsPage() {
@@ -484,7 +517,10 @@ export default function SettingsPage() {
                  
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest">Lookback Histórico (Velas)</label>
+                       <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
+                        Lookback Histórico (Velas)
+                        <InfoTooltip title={SETTINGS_HELP.trend_candles.title} content={SETTINGS_HELP.trend_candles.content} />
+                     </label>
                        <input 
                           type="number" 
                           value={settings.analysis?.trend_candles || 200}
@@ -493,7 +529,10 @@ export default function SettingsPage() {
                        />
                     </div>
                     <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest">Slope Mínimo (Pontos)</label>
+                       <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
+                        Slope Mínimo (Pontos)
+                        <InfoTooltip title={SETTINGS_HELP.slope_min.title} content={SETTINGS_HELP.slope_min.content} />
+                     </label>
                        <input 
                           type="number" step="0.01"
                           value={settings.signal_logic?.trend_min_slope_points || 0.20}
@@ -520,6 +559,7 @@ export default function SettingsPage() {
                 <div className="p-6 bg-white/[0.02] border border-white/5 rounded-[32px] space-y-4">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
                     <Target className="w-3 h-3 text-primary" /> Perfil de Operação (Fimathe)
+                    <InfoTooltip title={SETTINGS_HELP.trading_type.title} content={SETTINGS_HELP.trading_type.content} />
                   </label>
                   <select 
                     value={settings.signal_logic?.trading_type || 'manual'}
@@ -541,7 +581,10 @@ export default function SettingsPage() {
 
                 <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Timeframe Tendência</label>
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                      Timeframe Tendência
+                      <InfoTooltip title={SETTINGS_HELP.trend_timeframe.title} content={SETTINGS_HELP.trend_timeframe.content} />
+                   </label>
                    <select 
                       value={settings.signal_logic?.trend_timeframe || 'H1'}
                       onChange={(e) => updateNested('signal_logic', 'trend_timeframe', e.target.value)}
@@ -551,7 +594,10 @@ export default function SettingsPage() {
                    </select>
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Timeframe Entrada</label>
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                      Timeframe Entrada
+                      <InfoTooltip title={SETTINGS_HELP.entry_timeframe.title} content={SETTINGS_HELP.entry_timeframe.content} />
+                   </label>
                    <select 
                       value={settings.signal_logic?.entry_timeframe || 'M15'}
                       onChange={(e) => updateNested('signal_logic', 'entry_timeframe', e.target.value)}
@@ -561,7 +607,10 @@ export default function SettingsPage() {
                    </select>
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Breakout Buffer (Pts)</label>
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                    Breakout Buffer (Pts)
+                    <InfoTooltip title={SETTINGS_HELP.breakout_buffer.title} content={SETTINGS_HELP.breakout_buffer.content} />
+                  </label>
                    <input 
                       type="number"
                       value={settings.signal_logic?.breakout_buffer_points || 10}
@@ -570,7 +619,10 @@ export default function SettingsPage() {
                    />
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">S/R Tolerance (Pts)</label>
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                    S/R Tolerance (Pts)
+                    <InfoTooltip title={SETTINGS_HELP.sr_tolerance.title} content={SETTINGS_HELP.sr_tolerance.content} />
+                  </label>
                    <input 
                       type="number"
                       value={settings.signal_logic?.sr_tolerance_points || 35}
@@ -579,7 +631,10 @@ export default function SettingsPage() {
                    />
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Triângulo Fimathe (M1 Velas)</label>
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                     Triângulo Fimathe (M1 Velas)
+                     <InfoTooltip title={SETTINGS_HELP.triangle_m1.title} content={SETTINGS_HELP.triangle_m1.content} />
+                   </label>
                    <input 
                       type="number"
                       value={settings.signal_logic?.triangle_m1_candles || 10}
@@ -588,7 +643,10 @@ export default function SettingsPage() {
                    />
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Modo Take Profit (Nível)</label>
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                     Modo Take Profit (Nível)
+                     <InfoTooltip title={SETTINGS_HELP.target_level.title} content={SETTINGS_HELP.target_level.content} />
+                   </label>
                    <select 
                       value={settings.signal_logic?.target_level_mode || '80'}
                       onChange={(e) => updateNested('signal_logic', 'target_level_mode', e.target.value)}
@@ -710,7 +768,10 @@ export default function SettingsPage() {
               <div className="space-y-8">
                  <div className="space-y-3">
                     <div className="flex justify-between items-center group">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Risco por Trade</label>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center">
+                        Risco por Trade
+                        <InfoTooltip title={SETTINGS_HELP.risk_percent.title} content={SETTINGS_HELP.risk_percent.content} />
+                      </label>
                       <span className="text-primary font-black text-xl">{settings.risk_management?.risk_percent || 0.5}%</span>
                     </div>
                     <input 
@@ -725,7 +786,10 @@ export default function SettingsPage() {
                  <div className="space-y-4 pt-4">
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-white">Ciclo Fimathe Ativo</span>
+                          <span className="text-sm font-bold text-white flex items-center">
+                            Ciclo Fimathe Ativo
+                            <InfoTooltip title={SETTINGS_HELP.fimathe_cycle.title} content={SETTINGS_HELP.fimathe_cycle.content} />
+                          </span>
                           <span className="text-[10px] text-gray-500">Trailing dinâmico 50/80/100</span>
                        </div>
                        <input 
@@ -752,7 +816,10 @@ export default function SettingsPage() {
 
               <div className="space-y-6">
                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest">Max. Posições Simultâneas</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
+                      Max. Posições Simultâneas
+                      <InfoTooltip title={SETTINGS_HELP.max_positions.title} content={SETTINGS_HELP.max_positions.content} />
+                    </label>
                     <input 
                        type="number"
                        value={settings.risk_management?.max_open_positions || 3}
@@ -761,11 +828,17 @@ export default function SettingsPage() {
                     />
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Magic Number (Identificador)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest flex items-center">
+                      Magic Number (Identificador)
+                      <InfoTooltip title={SETTINGS_HELP.magic_number.title} content={SETTINGS_HELP.magic_number.content} />
+                    </label>
                     <input type="number" value={settings.risk_management?.magic_number || 202404} onChange={(e) => updateNested('risk_management', 'magic_number', parseInt(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white" />
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Cooldown entre Ordens (Segundos)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest flex items-center">
+                      Cooldown entre Ordens (Segundos)
+                      <InfoTooltip title={SETTINGS_HELP.cooldown.title} content={SETTINGS_HELP.cooldown.content} />
+                    </label>
                     <input type="number" value={settings.risk_management?.symbol_cooldown_seconds || 3600} onChange={(e) => updateNested('risk_management', 'symbol_cooldown_seconds', parseInt(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white" />
                  </div>
               </div>
@@ -789,7 +862,10 @@ export default function SettingsPage() {
 
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Servidor Corretora</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest flex items-center">
+                    Servidor Corretora
+                    <InfoTooltip title={SETTINGS_HELP.server.title} content={SETTINGS_HELP.server.content} />
+                  </label>
                   <input 
                     type="text"
                     value={settings.mt5_connection?.server || 'Alpari-MT5-Demo'}
@@ -799,7 +875,10 @@ export default function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Login (ID)</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest flex items-center">
+                      Login (ID)
+                      <InfoTooltip title={SETTINGS_HELP.login.title} content={SETTINGS_HELP.login.content} />
+                    </label>
                     <input 
                       type="number"
                       value={settings.mt5_connection?.login || 0}
@@ -842,7 +921,10 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Spread Máximo (Pontos)</label>
+                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest flex items-center">
+                     Spread Máximo (Pontos)
+                     <InfoTooltip title={SETTINGS_HELP.max_spread.title} content={SETTINGS_HELP.max_spread.content} />
+                   </label>
                    <div className="relative">
                     <input 
                       type="number"

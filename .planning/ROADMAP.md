@@ -154,15 +154,20 @@ Plans:
 
 ## Milestone 3: Expansão Operacional & Conectividade (Ativo)
 
-### Phase 18: Perfis de Operação e Presets (Fimathe Profiles)
-**Goal**: Implementar presets que configuram automaticamente os timeframes de acordo com o perfil (Scalper, Day Trader, etc) e adicionar selos visuais no monitor.
+### Phase 18: Perfis de Operação e Presets (Fimathe Profiles) [DONE]
+**Goal**: Implementar presets que configuram automaticamente os timeframes de acordo com o perfil e adicionar selos visuais no monitor.
 **Depends on**: Phase 17
-**Success Criteria**:
-1. Seletor de Perfil funcional na aba de Estratégia.
-2. Suporte aos timeframes D1 e W1 no backend.
-3. Selos de identificação (badges) visíveis no Monitor de Execução.
+**Success Criteria**: [COMPLETED]
 
-### Phase 19: Conexão MT5 Operacional via UI
+### Phase 19: UX Educativo - Tooltips Globais
+**Goal**: Adicionar Tooltips explicativos em todas as configurações da dashboard para facilitar o entendimento técnico.
+**Depends on**: Phase 18
+**Success Criteria**:
+1. Ícone `(?)` em todos os campos de `/settings` (Analysis, Signal Logic, Risk, Connection, UI).
+2. Descrições detalhadas e didáticas baseadas na estratégia Fimathe para cada parâmetro.
+3. Componente de visualização padronizado e premium.
+
+### Phase 20: Conexão MT5 Operacional via UI
 **Goal**: Tornar a configuração de conexão com o MetaTrader 5 (Servidor, Login, Senha) totalmente funcional através da interface web.
 ...
 ### Phase 20: Validação de Ativos e Regras da Corretora
