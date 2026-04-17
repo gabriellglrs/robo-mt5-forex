@@ -1,6 +1,6 @@
 "use client";
-
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { 
   Activity, 
   ChevronRight, 
@@ -264,10 +264,15 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
         </div>
         <div className="text-right">
           <div className="flex items-center gap-2 justify-end mb-1">
-             <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Price</span>
+             <Link href={`/monitor/${asset.symbol}`}>
+               <button className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-[#00FFAA] bg-[#00FFAA]/10 border border-[#00FFAA]/30 px-2 py-0.5 rounded-sm hover:bg-[#00FFAA]/20 transition-all">
+                  <Eye className="w-3 h-3" /> Terminal
+               </button>
+             </Link>
+             <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest ml-2">Price</span>
              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
           </div>
-          <p className="text-xl font-mono font-bold text-white leading-none">
+          <p className="text-xl font-mono font-bold text-white leading-none mt-1.5">
             {asset.price !== undefined && asset.price !== null ? asset.price.toFixed(5) : '0.00000'}
           </p>
         </div>

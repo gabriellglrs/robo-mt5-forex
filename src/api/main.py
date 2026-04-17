@@ -243,6 +243,44 @@ def get_runtime(user: str = Depends(get_current_user)):
     with open(FIMATHE_RUNTIME_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
+@app.get("/api/chart/{symbol}")
+def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current_user)):
+    import MetaTrader5 as mt5
+    
+    # Initialization
+    if not mt5.initialize():
+        raise HTTPException(status_code=500, detail=f"Terminal MT5 não inicializado. Erro: {mt5.last_error()}")
+    
+    # Mapping timeframe string to MT5 timeframe constants
+    timeframe_map = {
+        "M1": mt5.TIMEFRAME_M1,
+        "M5": mt5.TIMEFRAME_M5,
+        "M15": mt5.TIMEFRAME_M15,
+        "H1": mt5.TIMEFRAME_H1,
+        "H4": mt5.TIMEFRAME_H4,
+        "D1": mt5.TIMEFRAME_D1,
+    }
+    
+    mt5_tf = timeframe_map.get(tf.upper(), mt5.TIMEFRAME_M15)
+    
+    # Fetch last 500 candles
+    rates = mt5.copy_rates_from_pos(symbol.upper(), mt5_tf, 0, 500)
+    
+    if rates is None or len(rates) == 0:
+        raise HTTPException(status_code=404, detail=f"Dados do ativo {symbol} não acessíveis. Certifique-se que está na observação do mercado.")
+        
+    formatted_data = []
+    for rate in rates:
+        formatted_data.append({
+            "time": int(rate['time']),
+            "open": float(rate['open']),
+            "high": float(rate['high']),
+            "low": float(rate['low']),
+            "close": float(rate['close'])
+        })
+        
+    return formatted_data
+
 @app.get("/metrics")
 def get_metrics(user: str = Depends(get_current_user)):
     """Versão simplificada de métricas para o monitor."""

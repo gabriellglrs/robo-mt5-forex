@@ -2,12 +2,8 @@
     "running_state": true,
     "analysis": {
         "symbols": [
-            "EURUSD",
-            "GBPUSD",
-            "EURGBP",
-            "GBPAUD",
-            "USDCAD",
-            "NZDUSD"
+            "BTCUSD",
+            "ETHUSD"
         ],
         "history_years": 2,
         "wick_sensitivity": 0.3,
@@ -19,12 +15,12 @@
         "breakout_buffer_points": 10,
         "trend_min_slope_points": 0.2,
         "sr_tolerance_points": 35,
-        "require_grouping": true,
+        "require_grouping": false,
         "require_channel_break": true,
         "require_sr_touch": false,
         "max_spread_points": 0,
         "require_pullback_retest": false,
-        "strict_reversal_logic": true,
+        "strict_reversal_logic": false,
         "require_structural_trend": false,
         "triangle_m1_candles": 5,
         "target_level_mode": "80",

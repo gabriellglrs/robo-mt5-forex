@@ -175,8 +175,14 @@ Plans:
 2. Lógica FIM-018 implementada no motor de execução.
 3. Configurações visuais e tooltips adicionados para as novas regras.
 
-### Phase 21: Conexão MT5 Operacional via UI
-**Goal**: Tornar a configuração de conexão com o MetaTrader 5 (Servidor, Login, Senha) totalmente funcional através da interface web.
+### Phase 21: Asset Deep Dive & Live Charting (Terminal de Batalha)
+**Goal**: Transformar o robô em uma ferramenta visual completa, integrando gráficos interativos (TradingView Lightweight Charts) diretamente na Dashboard com conexão em tempo real aos níveis da Fimathe.
+**Depends on**: Phase 20
+**Success Criteria**:
+1. Conexão MT5 (`copy_rates_from_pos`) estabelecida na API (FastAPI) para exportar histórico de velas.
+2. Novo componente `LiveChart.tsx` integrado no painel Web com opção de troca de timeframes (M1 / M15).
+3. Nova rota dedicada `/monitor/[symbol]` (Painel do Ativo) renderizando a sobreposição das "Price Lines" (A, B, Projeções e Stop Loss) sobre as velas.
+4. "Caixa Preta" e Matriz de Auditoria expandida visíveis lado a lado com o gráfico.
 
 ### Objetivo
 Registrar melhorias futuras da camada web, sem alterar o escopo atual do robo.
