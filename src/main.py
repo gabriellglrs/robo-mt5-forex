@@ -95,10 +95,14 @@ def build_symbol_engines(symbols, settings, db_manager):
             signal_logic_settings["entry_timeframe"] = entry_tf
         signal_detector = SignalDetector(symbol, signal_logic_settings)
 
+        # Busca a configuracao ativa no banco para auditoria
+        active_settings_id = db_manager.get_latest_settings_id()
+
         risk_manager = RiskManager(symbol, risk_cfg)
         order_engine = OrderEngine(
             magic_number=risk_cfg.get("magic_number", 202404),
             db_manager=db_manager,
+            settings_id=active_settings_id
         )
 
         levels = detector.get_levels(mode=STRATEGY_NAME)
@@ -165,7 +169,7 @@ def build_analysis_flow_payload(symbol, current_price, details, open_count, max_
         "tf_results": tf_summary,
         "open_positions": int(open_count),
         "max_open_positions": int(max_pos),
-        "display_text": f"[{symbol}] {details.get('rule_name') or 'Aguardando'}: {details.get('next_trigger') or 'Monitorando setup.'}",
+        "display_text": f"[{details.get('trading_preset', 'MANUAL').upper()}|{details.get('management_preset', 'PADRAO').upper()}] {symbol}: {details.get('next_trigger') or 'Monitorando setup.'}",
     }
 
 
@@ -690,6 +694,13 @@ def main():
                 continue
             
             runtime_snapshot["status"] = "running"
+            
+            # Poda o snapshot: Garante que apenas ativos com motores ativos apareçam no Monitor
+            if "symbols" in runtime_snapshot:
+                stale_in_runtime = set(runtime_snapshot["symbols"].keys()) - set(engines.keys())
+                for stale_s in stale_in_runtime:
+                    logger.info(f"Poda de Seguranca: Removendo {stale_s} do snapshot (motor inativo).")
+                    del runtime_snapshot["symbols"][stale_s]
 
             # Coleta de dados financeiros globais e por símbolo
             acc_info = mt5.account_info()
@@ -747,9 +758,16 @@ def main():
                     order_engine = engine["order_engine"]
                     mt5_positions = order_engine.get_open_positions(symbol)
                     db_trades = db_manager.get_open_trades(symbol)
+                    mt5_tickets = {p.ticket for p in mt5_positions}
                     
-                    # Consolidacao por tickets unicos para evitar 'Race Conditions' e duplicidade
-                    active_tickets = {p.ticket for p in mt5_positions} | {t["ticket"] for t in db_trades}
+                    # Reconciliação em tempo real: se está no banco como OPEN mas sumiu do MT5
+                    for t in db_trades:
+                        if t["ticket"] not in mt5_tickets:
+                            logger.warning(f"[{symbol}] Reconciliacao em tempo real: Ticket #{t['ticket']} no banco mas nao no MT5. Sincronizando...")
+                            order_engine.sync_position_closure(t["ticket"])
+                    
+                    # Atualiza tickets ativos para o cálculo de exposição
+                    active_tickets = mt5_tickets | {t["ticket"] for t in db_manager.get_open_trades(symbol)}
                     open_count = len(active_tickets)
                     
                     current_tickets = {pos.ticket for pos in mt5_positions}
@@ -829,12 +847,16 @@ def main():
                     is_heartbeat = (now_ts - last_audit_log_ts_per_symbol.get(symbol, 0.0)) >= 600 # 10 minutos
                     
                     if is_state_change or is_heartbeat:
+                        # Injeta nomes amigaveis dos presets para o payload do Dashboard
+                        details["trading_preset"] = signal_cfg.get("trading_type", "manual")
+                        details["management_preset"] = risk_cfg.get("fimathe_management_mode", "standard")
+
                         payload = build_analysis_flow_payload(
                             symbol=symbol,
                             current_price=current_price,
                             details=details,
                             open_count=open_count,
-                            max_pos=max_pos,
+                            max_pos=max_pos
                         )
                         log_msg = f"{payload.get('display_text', symbol)} | {json.dumps(payload, ensure_ascii=False)}"
                         db_manager.log_event("INFO", "AnalysisFlow", log_msg)

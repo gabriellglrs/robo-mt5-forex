@@ -1,8 +1,14 @@
 import json
 import os
+import sys
+
+# --- CONFIGURACAO DE PATH (CRITICO PARA IMPORTACAO DO PACOTE SRC) ---
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 import signal
 import subprocess
-import sys
 import time
 import ctypes
 from datetime import datetime
@@ -17,8 +23,9 @@ from jose import JWTError, jwt
 import bcrypt
 from pydantic import BaseModel
 
+from src.core.database import DatabaseManager
+
 # --- CONFIGURACOES ---
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SETTINGS_FILE = os.path.join(PROJECT_ROOT, "config", "settings.json")
 ROBOT_MAIN_FILE = os.path.join(PROJECT_ROOT, "src", "main.py")
 ROBOT_STATE_FILE = os.path.join(PROJECT_ROOT, "config", "robot_runtime.json")
@@ -215,9 +222,19 @@ def get_settings(user: str = Depends(get_current_user)):
 
 @app.post("/settings")
 def update_settings(update: SettingsUpdate, user: str = Depends(get_current_user)):
+    # 1. Salva no arquivo JSON (Cache Local/Resiliencia)
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(update.settings, f, indent=4, ensure_ascii=False)
-    return {"message": "Configuracoes atualizadas."}
+    
+    # 2. Salva no Banco de Dados (Auditoria Historica)
+    try:
+        db = DatabaseManager()
+        db.save_settings_snapshot(update.settings)
+    except Exception as e:
+        print(f"Erro ao gravar snapshot de settings no DB: {e}")
+        # Nao lancamos erro aqui para nao travar o save do arquivo se o DB falhar
+        
+    return {"message": "Configurações atualizadas e snapshot de auditoria criado."}
 
 @app.get("/runtime")
 def get_runtime(user: str = Depends(get_current_user)):
@@ -371,27 +388,85 @@ def clear_logs(user: str = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/maintenance/reset-data")
+def reset_data(user: str = Depends(get_current_user)):
+    """Limpa todo o histórico de trades e eventos do dashboard."""
+    try:
+        # 1. Verifica se o robô está rodando (opcional, mas recomendado)
+        # Por simplicidade, vamos permitir, mas logar
+        print(f"[{datetime.now()}] RESET DE DADOS solicitado por {user}")
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 2. Limpa histórico de trades
+        cursor.execute("DELETE FROM trades")
+        
+        # 3. Limpa logs do sistema
+        cursor.execute("DELETE FROM system_logs")
+        
+        conn.commit()
+        conn.close()
+
+        # 4. Limpa eventos recentes do snapshot runtime
+        if os.path.exists(RUNTIME_FILE):
+            try:
+                with open(RUNTIME_FILE, "r", encoding="utf-8") as f:
+                    runtime = json.load(f)
+                
+                runtime["recent_events"] = []
+                # Também poderíamos zerar estatísticas globais aqui se existirem
+                
+                with open(RUNTIME_FILE, "w", encoding="utf-8") as f:
+                    json.dump(runtime, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print(f"Erro ao limpar runtime events: {e}")
+
+        return {"message": "Dados de histórico e eventos limpos com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 def background_log_cleaner():
-    """Tarefa de segundo plano para limpar logs antigos automaticamente."""
+    """Tarefa de segundo plano para limpeza inteligente de logs baseada em tempo ou quantidade."""
     while True:
         try:
             if os.path.exists(SETTINGS_FILE):
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                     settings = json.load(f)
                 
-                # O intervalo de limpeza fica em ui_settings para facilitar a edicao na UI
-                cleanup_minutes = settings.get("ui_settings", {}).get("log_cleanup_minutes", 0)
+                # Suporte ao novo formato log_management ou fallback para o antigo ui_settings
+                log_mgr = settings.get("log_management", {})
+                mode = log_mgr.get("mode", "minutes")
+                limit = log_mgr.get("value", settings.get("ui_settings", {}).get("log_cleanup_minutes", 0))
                 
-                if cleanup_minutes > 0:
+                if limit > 0:
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    # Deleta logs anteriores ao intervalo definido
-                    cursor.execute(
-                        "DELETE FROM system_logs WHERE timestamp < NOW() - INTERVAL %s MINUTE",
-                        (cleanup_minutes,)
-                    )
+                    
+                    if mode == "minutes":
+                        # Deleta logs anteriores ao intervalo de minutos
+                        cursor.execute(
+                            "DELETE FROM system_logs WHERE timestamp < NOW() - INTERVAL %s MINUTE",
+                            (limit,)
+                        )
+                    else:
+                        # Modo Quantidade: Mantem apenas os ultimos X registros
+                        # Usamos uma subquery para evitar o erro de deletar da mesma tabela sendo selecionada
+                        query = """
+                        DELETE FROM system_logs 
+                        WHERE id NOT IN (
+                            SELECT id FROM (
+                                SELECT id FROM system_logs 
+                                ORDER BY id DESC 
+                                LIMIT %s
+                            ) as tmp
+                        )
+                        """
+                        cursor.execute(query, (limit,))
+
                     if cursor.rowcount > 0:
-                        print(f"[{datetime.now()}] Auto-cleanup: {cursor.rowcount} logs removidos.")
+                        print(f"[{datetime.now()}] [Auto-Cleanup] Modo: {mode} | Valor: {limit} | {cursor.rowcount} logs removidos.")
+                    
                     conn.commit()
                     conn.close()
         except Exception as e:

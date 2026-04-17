@@ -32,7 +32,21 @@ class DatabaseManager:
             self.logger.error(f"Erro ao conectar ao MySQL: {exc}")
 
     def _create_tables(self):
-        """Cria tabela de trades caso nao exista."""
+        """Cria tabelas do sistema caso nao existam."""
+        # Tabela para auditoria de versoes de configuracao
+        settings_sql = """
+        CREATE TABLE IF NOT EXISTS settings_snapshots (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            trading_preset VARCHAR(50),
+            management_preset VARCHAR(50),
+            risk_percent DOUBLE,
+            magic_number INT,
+            settings_json JSON,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+        # Tabela de trades com vinculo de auditoria
         trades_sql = """
         CREATE TABLE IF NOT EXISTS trades (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -50,25 +64,48 @@ class DatabaseManager:
             tp DOUBLE,
             pnl DOUBLE,
             status VARCHAR(15) DEFAULT 'OPEN',
-            indicators_json JSON
+            indicators_json JSON,
+            settings_id INT,
+            FOREIGN KEY (settings_id) REFERENCES settings_snapshots(id)
+        )
+        """
+
+        # Tabela de logs do sistema
+        logs_sql = """
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            level VARCHAR(10),
+            module VARCHAR(50),
+            message TEXT,
+            timestamp DATETIME
         )
         """
 
         conn = self.pool.get_connection()
         cursor = conn.cursor()
         try:
+            cursor.execute(settings_sql)
             cursor.execute(trades_sql)
+            cursor.execute(logs_sql)
+            
+            # Adiciona a coluna settings_id caso a tabela trades ja exista (migracao)
+            try:
+                cursor.execute("ALTER TABLE trades ADD COLUMN settings_id INT")
+                cursor.execute("ALTER TABLE trades ADD FOREIGN KEY (settings_id) REFERENCES settings_snapshots(id)")
+            except Exception:
+                pass # Coluna ja existe
+
             conn.commit()
-            self.logger.info("Tabela trades verificada/criada.")
+            self.logger.info("Tabelas do sistema (trades, logs, settings) verificadas/criadas.")
         finally:
             cursor.close()
             conn.close()
 
-    def save_trade_open(self, ticket, symbol, magic, trade_type, timeframe, strategy, price, sl, tp, indicators):
-        """Registra abertura de nova posicao."""
+    def save_trade_open(self, ticket, symbol, magic, trade_type, timeframe, strategy, price, sl, tp, indicators, settings_id=None):
+        """Registra abertura de nova posicao vinculada a um snapshot de configuracao."""
         sql = """
-        INSERT INTO trades (ticket, symbol, magic, type, timeframe, strategy, entry_price, entry_time, sl, tp, indicators_json)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO trades (ticket, symbol, magic, type, timeframe, strategy, entry_price, entry_time, sl, tp, indicators_json, settings_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         data = (
             ticket,
@@ -82,6 +119,7 @@ class DatabaseManager:
             sl,
             tp,
             json.dumps(indicators),
+            settings_id
         )
 
         conn = self.pool.get_connection()
@@ -220,6 +258,58 @@ class DatabaseManager:
             self.logger.info(f"Trade #{ticket} encerrado no banco (PnL: {pnl:.2f}).")
         except Exception as exc:
             self.logger.error(f"Erro ao salvar fechamento de trade: {exc}")
+        finally:
+            cursor.close()
+            conn.close()
+
+    def save_settings_snapshot(self, settings_dict):
+        """Salva um snapshot completo das configuracoes atuais para auditoria."""
+        sql = """
+        INSERT INTO settings_snapshots (trading_preset, management_preset, risk_percent, magic_number, settings_json)
+        VALUES (%s, %s, %s, %s, %s)
+        """
+        
+        # Extrai campos amigaveis para facilitar a busca no DB sem abrir o JSON
+        trading_preset = settings_dict.get("signal_logic", {}).get("trading_type", "manual")
+        management_preset = settings_dict.get("risk_management", {}).get("fimathe_management_mode", "standard")
+        risk_percent = settings_dict.get("risk_management", {}).get("risk_percent", 0.0)
+        magic_number = settings_dict.get("risk_management", {}).get("magic_number", 0)
+
+        data = (
+            trading_preset,
+            management_preset,
+            risk_percent,
+            magic_number,
+            json.dumps(settings_dict, ensure_ascii=False)
+        )
+
+        conn = self.pool.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, data)
+            conn.commit()
+            snapshot_id = cursor.lastrowid
+            self.logger.info(f"Snapshot de configuracoes #{snapshot_id} salvo no banco.")
+            return snapshot_id
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar snapshot de configuracoes: {exc}")
+            return None
+        finally:
+            cursor.close()
+            conn.close()
+
+    def get_latest_settings_id(self):
+        """Retorna o ID do ultimo snapshot de configuracao gravado."""
+        sql = "SELECT id FROM settings_snapshots ORDER BY id DESC LIMIT 1"
+        conn = self.pool.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql)
+            row = cursor.fetchone()
+            return row[0] if row else None
+        except Exception as exc:
+            self.logger.error(f"Erro ao buscar ultimo ID de settings: {exc}")
+            return None
         finally:
             cursor.close()
             conn.close()

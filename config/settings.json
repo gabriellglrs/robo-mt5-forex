@@ -4,22 +4,14 @@
         "symbols": [
             "EURUSD",
             "GBPUSD",
-            "AUDUSD",
-            "USDJPY",
             "EURGBP",
-            "EURJPY",
-            "HK50",
-            "NZDUSD",
-            "EURCHF",
-            "AUDJPY",
-            "GBPJPY",
-            "XAUUSD",
-            "XAGUSD",
-            "BTCUSD"
+            "GBPAUD",
+            "USDCAD",
+            "NZDUSD"
         ],
         "history_years": 2,
         "wick_sensitivity": 0.3,
-        "trend_candles": 200
+        "trend_candles": 300
     },
     "signal_logic": {
         "trend_timeframe": "M15",
@@ -33,23 +25,34 @@
         "max_spread_points": 0,
         "require_pullback_retest": false,
         "strict_reversal_logic": true,
-        "require_structural_trend": true,
-        "triangle_m1_candles": 10,
-        "target_level_mode": "80"
+        "require_structural_trend": false,
+        "triangle_m1_candles": 5,
+        "target_level_mode": "80",
+        "trading_type": "scalper",
+        "max_slippage_points": 30,
+        "fimathe_cycle_top_level": "100"
     },
     "risk_management": {
-        "risk_percent": 2.5,
+        "risk_percent": 1,
         "max_open_positions": 1,
         "magic_number": 202404,
         "symbol_cooldown_seconds": 300,
         "use_breakeven": true,
         "breakeven_trigger_points": 120,
         "breakeven_offset_points": 5,
-        "fimathe_cycle_enabled": true
+        "fimathe_cycle_enabled": true,
+        "fimathe_management_mode": "conservative",
+        "fimathe_be_trigger_percent": 50,
+        "fimathe_cycle_breakeven_offset_points": 10,
+        "fimathe_trail_step_percent": 100
     },
     "ui_settings": {
         "analysis_flow_interval_seconds": 5,
         "theme": "dark",
-        "log_cleanup_minutes": 5
+        "log_cleanup_minutes": 15
+    },
+    "log_management": {
+        "mode": "quantity",
+        "value": 50
     }
 }

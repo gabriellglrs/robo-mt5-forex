@@ -70,11 +70,15 @@ class SignalDetector:
             projection_50 = point_a + (channel_size * 0.50)
             projection_80 = point_a + (channel_size * 0.80)
             projection_85 = point_a + (channel_size * 0.85)
+            projection_90 = point_a + (channel_size * 0.90)
+            projection_95 = point_a + (channel_size * 0.95)
             projection_100 = point_a + (channel_size * 1.00)
         else:
             projection_50 = point_b - (channel_size * 0.50)
             projection_80 = point_b - (channel_size * 0.80)
             projection_85 = point_b - (channel_size * 0.85)
+            projection_90 = point_b - (channel_size * 0.90)
+            projection_95 = point_b - (channel_size * 0.95)
             projection_100 = point_b - (channel_size * 1.00)
 
         return {
@@ -84,6 +88,8 @@ class SignalDetector:
             "projection_50": projection_50,
             "projection_80": projection_80,
             "projection_85": projection_85,
+            "projection_90": projection_90,
+            "projection_95": projection_95,
             "projection_100": projection_100,
         }
 
@@ -113,6 +119,8 @@ class SignalDetector:
             projection_map.get("projection_50"),
             projection_map.get("projection_80"),
             projection_map.get("projection_85"),
+            projection_map.get("projection_90"),
+            projection_map.get("projection_95"),
             projection_map.get("projection_100"),
         ]
         levels = [float(level) for level in levels if level is not None]
@@ -342,6 +350,8 @@ class SignalDetector:
                     "projection_50": round(float(projection_map["projection_50"]), 5),
                     "projection_80": round(float(projection_map["projection_80"]), 5),
                     "projection_85": round(float(projection_map["projection_85"]), 5),
+                    "projection_90": round(float(projection_map["projection_90"]), 5),
+                    "projection_95": round(float(projection_map["projection_95"]), 5),
                     "projection_100": round(float(projection_map["projection_100"]), 5),
                 },
                 entry_tf: {
@@ -377,6 +387,8 @@ class SignalDetector:
             "projection_50": projection_map["projection_50"],
             "projection_80": projection_map["projection_80"],
             "projection_85": projection_map["projection_85"],
+            "projection_90": projection_map["projection_90"],
+            "projection_95": projection_map["projection_95"],
             "projection_100": projection_map["projection_100"],
             "candidate_signal": candidate_signal,
             "rule_trace": decision["rule_trace"],

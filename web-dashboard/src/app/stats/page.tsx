@@ -216,31 +216,53 @@ export default function PerformanceStatsPage() {
           </div>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.pnl_curve}>
-                <defs>
-                  <linearGradient id="colorPnlStats" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00FFAA" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#00FFAA" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="time" hide />
-                <YAxis stroke="rgba(156, 163, 175, 0.5)" fontSize={10} tickFormatter={(val) => `$${val}`} />
-                <Tooltip 
-                  contentStyle={{ background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '12px' }}
-                  itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-                  labelStyle={{ display: 'none' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="pnl" 
-                  stroke="#00FFAA" 
-                  strokeWidth={4} 
-                  fillOpacity={1} 
-                  fill="url(#colorPnlStats)" 
-                  animationDuration={2000}
-                />
-              </AreaChart>
+              {(() => {
+                if (!stats?.pnl_curve || stats.pnl_curve.length === 0) return null;
+                
+                const dataMax = Math.max(...stats.pnl_curve.map((v: any) => v.pnl));
+                const dataMin = Math.min(...stats.pnl_curve.map((v: any) => v.pnl));
+                
+                let off = 0;
+                if (dataMax <= 0) off = 0;
+                else if (dataMin >= 0) off = 1;
+                else off = dataMax / (dataMax - dataMin);
+
+                const gradientId = "splitColorStats";
+                const strokeId = "strokeColorStats";
+
+                return (
+                  <AreaChart data={stats.pnl_curve}>
+                    <defs>
+                      <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset={off} stopColor="#00FFAA" stopOpacity={0.4} />
+                        <stop offset={off} stopColor="#EF4444" stopOpacity={0.4} />
+                      </linearGradient>
+                      <linearGradient id={strokeId} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset={off} stopColor="#00FFAA" stopOpacity={1} />
+                        <stop offset={off} stopColor="#EF4444" stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="time" hide />
+                    <YAxis stroke="rgba(156, 163, 175, 0.5)" fontSize={10} tickFormatter={(val) => `$${val}`} />
+                    <Tooltip 
+                      contentStyle={{ background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '12px' }}
+                      itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                      labelStyle={{ display: 'none' }}
+                      formatter={(value: any) => [`$${parseFloat(value).toFixed(2)}`, 'PnL Acumulado']}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="pnl" 
+                      stroke={`url(#${strokeId})`} 
+                      strokeWidth={4} 
+                      fillOpacity={1} 
+                      fill={`url(#${gradientId})`} 
+                      animationDuration={2000}
+                    />
+                  </AreaChart>
+                );
+              })()}
             </ResponsiveContainer>
           </div>
         </div>

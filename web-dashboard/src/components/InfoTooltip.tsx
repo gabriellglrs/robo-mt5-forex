@@ -7,14 +7,18 @@ import { HelpCircle } from 'lucide-react';
 interface InfoTooltipProps {
   title: string;
   content: string;
+  direction?: 'up' | 'down';
 }
 
-export const InfoTooltip: React.FC<InfoTooltipProps> = ({ title, content }) => {
+export const InfoTooltip: React.FC<InfoTooltipProps> = ({ title, content, direction = 'up' }) => {
   const [isVisible, setIsVisible] = useState(false);
+
+  const isUp = direction === 'up';
 
   return (
     <div className="relative inline-block ml-1.5 align-middle group">
       <button
+        type="button"
         onMouseEnter={() => setIsVisible(true)}
         onMouseLeave={() => setIsVisible(false)}
         className="p-1 rounded-full text-gray-500 hover:text-primary transition-colors focus:outline-none"
@@ -25,18 +29,21 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ title, content }) => {
       <AnimatePresence>
         {isVisible && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: isUp ? 10 : -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-50 w-64 pointer-events-none"
+            exit={{ opacity: 0, y: isUp ? 10 : -10, scale: 0.95 }}
+            className={`absolute ${isUp ? 'bottom-full mb-3' : 'top-full mt-3'} left-1/2 -translate-x-1/2 z-50 w-64 pointer-events-none`}
           >
-            <div className="p-4 rounded-2xl border border-white/10 bg-[#0a0a0b]/95 backdrop-blur-xl shadow-2xl">
+            <div className="p-4 rounded-2xl border border-white/10 bg-[#0a0a0b]/95 backdrop-blur-xl shadow-2xl relative">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-primary mb-1.5">{title}</h4>
               <p className="text-[11px] text-gray-300 leading-relaxed font-medium">
                 {content}
               </p>
+              
               {/* Arrow */}
-              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#0a0a0b] rotate-45 border-r border-b border-white/10" />
+              <div className={`absolute ${isUp ? '-bottom-1' : '-top-1'} left-1/2 -translate-x-1/2 w-2 h-2 bg-[#0a0a0b] rotate-45 border-white/10 ${
+                isUp ? 'border-r border-b' : 'border-l border-t'
+              }`} />
             </div>
           </motion.div>
         )}

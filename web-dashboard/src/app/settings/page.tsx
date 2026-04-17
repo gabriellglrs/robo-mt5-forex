@@ -28,6 +28,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { RuleTooltip } from '@/components/RuleTooltip';
 import { InfoTooltip } from '@/components/InfoTooltip';
+import { motion } from 'framer-motion';
 
 const POPULAR_SYMBOLS = [
   "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", // Majors
@@ -105,7 +106,7 @@ const FIMATHE_RULES = [
     key: 'require_channel_break', 
     category: 'signal_logic',
     purpose: 'Validação de força compradora ou vendedora real.',
-    onActive: 'Exige que o candle feche com o corpo fora da borda, ignorando pavios enganosos.',
+    onActive: 'Exige que o candle feche com o corpo fora da borda, ignorando pavios ignorosos.',
     onInactive: 'Entradas antecipadas; ganha alguns pontos, mas aumenta o risco de rompimento falso.'
   },
   { 
@@ -233,21 +234,28 @@ const SETTINGS_HELP = {
   max_spread: { title: "Spread Máximo", content: "Filtro de custo. Bloqueia entradas se a corretora estiver cobrando uma taxa (spread) maior que o definido aqui." },
 
   // Risk
-  risk_percent: { title: "Risco por Trade", content: "Porcentagem do saldo que você aceita perder por operação. O lote é calculado automaticamente via Fimathe." },
-  max_positions: { title: "Limite de Posições", content: "Máximo de operações abertas ao mesmo tempo em ativos diferentes para controlar sua exposição total." },
-  magic_number: { title: "Magic Number", content: "Identificador único das ordens deste robô. Evita que o robô interfira em operações que você abriu manualmente." },
-  cooldown: { title: "Tempo de Espera", content: "Intervalo obrigatório entre fechar uma ordem e abrir outra no mesmo ativo, evitando o overtrading emocional." },
-  fimathe_cycle: { title: "Ciclo Fimathe", content: "Gestão dinâmica: Stop no 0x0 ao atingir 50% de lucro, e trava 50% de lucro ao bater 100% do alvo." },
+  risk_percent: { title: "Risco por Operação", content: "Quanto do seu saldo você aceita arriscar nesta configuração. O robô calcula o tamanho da entrada automaticamente para te proteger." },
+  max_positions: { title: "Limite de Operações", content: "Máximo de apostas abertas ao mesmo tempo. Ajuda a não colocar todos os ovos na mesma cesta." },
+  magic_number: { title: "Identificador (ID)", content: "Número de registro das ordens. Permite que você saiba quais trades foram do robô e quais foram seus." },
+  cooldown: { title: "Tempo de Pausa", content: "Intervalo obrigatório entre uma operação e outra para evitar que o robô opere demais em momentos ruins." },
+  fimathe_cycle: { title: "Proteção Automática", content: "Define como o robô protege seu dinheiro. Ele trava o lucro à medida que o preço caminha a seu favor para você não devolver o ganho." },
+  be_automativo: { title: "Break-even Automático", content: "Ao atingir o 1º nível de expansão, o robô move seu Stop para o preço de entrada (0x0). Risco zero garantido." },
+  be_offset: { title: "Gordurinha de Lucro", content: "Define quantos pontos acima da entrada o robô deve travar o lucro. Ideal para cobrir custos de comissão e sair sempre no positivo." },
+  
+  // Management Modes
+  mode_standard: { title: "Modo Padrão", content: "O clássico Fimathe: move para o 0x0 no primeiro nível e trava 50% de lucro quando atinge o alvo cheio." },
+  mode_conservative: { title: "Modo Conservador", content: "Foco total em segurança. Trava no 0x0 o mais rápido possível e não aceita devolver lucro." },
+  mode_infinity: { title: "Modo Infinity", content: "O perseguidor de tendências. O Stop segue o preço nível a nível, buscando capturar movimentos explosivos sem limite de ganho." },
   
   // Connection
-  server: { title: "Servidor MT5", content: "O nome exato do servidor da sua corretora (ex: Alpari-MT5-Demo) para conexão do motor Python." },
-  login: { title: "Login ID", content: "O número da sua conta de negociação no MetaTrader 5." },
+  server: { title: "Servidor Corretora", content: "O endereço digital da sua corretora (ex: XP-Investimentos). Necessário para o robô saber onde operar." },
+  login: { title: "ID da Conta", content: "Seu número de usuário no MetaTrader 5." },
   
   // Misc
-  triangle_m1: { title: "Triângulo M1", content: "Quantidade de velas no M1 para validar a consolidação (triângulo) antes de uma entrada ou reversão." },
+  triangle_m1: { title: "Triângulo de Segurança", content: "O robô espera o preço 'descansar' um pouco antes de entrar, para confirmar que o movimento de rompimento é real." },
   management_mode: { 
-    title: "Modo de Gestão (FIM-017/018)", 
-    content: "Define como o Stop Loss será arrastado. 'Conservador' trava no 0x0 e não move mais. 'Infinity' remove o Take Profit e arrasta o stop nível a nível para sempre." 
+    title: "Modo de Proteção (FIM-017/018)", 
+    content: "Escolha como o lucro será travado: Padrão (trava metade), Conservador (só protege o que já ganhou) ou Infinity (persegue o preço sem limite)." 
   },
   be_trigger: { 
     title: "Gatilho de Break-even (%)", 
@@ -267,6 +275,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('strategy'); // 'strategy', 'risk', 'connection'
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [hoveredRuleId, setHoveredRuleId] = useState<string | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -303,7 +313,10 @@ export default function SettingsPage() {
     if (!token) return;
 
     setSaving(true);
+    setNotification({ message: '💾 SALVANDO CONFIGURAÇÕES...', type: 'success' });
+    
     try {
+      // 1. Salva as configurações
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/settings`, {
         method: 'POST',
         headers: { 
@@ -313,18 +326,38 @@ export default function SettingsPage() {
         body: JSON.stringify({ settings }),
       });
       
-      if (res.ok) {
-        setNotification({ message: 'CONFIGURAÇÕES APLICADAS: O robô já está operando com os novos parâmetros.', type: 'success' });
-        setTimeout(() => setNotification(null), 5000);
+      if (!res.ok) throw new Error('Falha ao salvar');
+
+      // 2. Comanda a Parada do Robô
+      setNotification({ message: '🛑 REINICIANDO MOTOR: Parando processo atual...', type: 'success' });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/stop`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      // 3. Delay de 6 segundos para estabilização
+      setNotification({ message: '⏳ SINCRONIZANDO: Aguardando 6 segundos...', type: 'success' });
+      await new Promise(resolve => setTimeout(resolve, 6000));
+
+      // 4. Comanda o Início do Robô
+      setNotification({ message: '🚀 MOTORIZANDO: Ligando com novos presets...', type: 'success' });
+      const startRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/start`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (startRes.ok) {
+        setNotification({ message: '✅ SINCRO CONCLUÍDA: Robô operando com novos parâmetros.', type: 'success' });
       } else {
-        setNotification({ message: 'ERRO AO SALVAR: Verifique a conexão com a API.', type: 'error' });
-        setTimeout(() => setNotification(null), 5000);
+        setNotification({ message: '⚠️ AVISO: Configurações salvas, mas o robô não iniciou sozinho.', type: 'error' });
       }
+
     } catch (e) { 
-      setNotification({ message: 'ERRO CRÍTICO: Não foi possível alcançar o servidor.', type: 'error' });
+      setNotification({ message: 'ERRO CRÍTICO: Não foi possível completar a sincronização.', type: 'error' });
+    } finally {
+      setSaving(false);
       setTimeout(() => setNotification(null), 5000);
     }
-    setSaving(false);
   };
 
   const handleLogout = () => {
@@ -366,18 +399,25 @@ export default function SettingsPage() {
         fimathe_management_mode: mode, 
         fimathe_cycle_enabled: true 
       };
+
+      const signal = {
+        ...prev.signal_logic
+      };
       
       // Presets recomendados baseado no modo
       if (mode === 'standard') {
         risk.fimathe_be_trigger_percent = 50;
+        signal.fimathe_cycle_top_level = '80';
       } else if (mode === 'conservative') {
         risk.fimathe_be_trigger_percent = 50;
+        signal.fimathe_cycle_top_level = '80';
       } else if (mode === 'infinity') {
         risk.fimathe_be_trigger_percent = 50;
         risk.fimathe_trail_step_percent = 100;
+        signal.fimathe_cycle_top_level = '100';
       }
       
-      return { ...prev, risk_management: risk };
+      return { ...prev, risk_management: risk, signal_logic: signal };
     });
     
     setNotification({ 
@@ -385,6 +425,31 @@ export default function SettingsPage() {
       type: 'success' 
     });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleResetData = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setResetting(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/maintenance/reset-data`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        setNotification({ message: 'RESET CONCLUÍDO: Todos os dados de histórico foram apagados.', type: 'success' });
+        setShowResetModal(false);
+        // Pequeno delay para usuário ler o toast antes de recarregar
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setNotification({ message: 'ERRO NO RESET: Não foi possível limpar os dados.', type: 'error' });
+      }
+    } catch (e) {
+      setNotification({ message: 'ERRO CRÍTICO: Falha na comunicação com o servidor.', type: 'error' });
+    }
+    setResetting(false);
   };
 
   if (loading) return (
@@ -397,6 +462,21 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      <style jsx global>{`
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+        .premium-input:focus {
+           box-shadow: 0 0 15px rgba(0, 212, 255, 0.15);
+           border-color: rgba(0, 212, 255, 0.4);
+        }
+      `}</style>
+      
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
@@ -453,6 +533,50 @@ export default function SettingsPage() {
           <button onClick={() => setNotification(null)} className="ml-4 text-white/20 hover:text-white transition-colors">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="glass max-w-md w-full p-10 rounded-[48px] border border-red-500/20 shadow-2xl relative overflow-hidden"
+          >
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-red-500/10 blur-[100px] rounded-full" />
+            
+            <div className="flex flex-col items-center text-center space-y-6 relative z-10">
+              <div className="p-5 rounded-3xl bg-red-500/10 border border-red-500/20 text-red-500">
+                <Trash2 className="w-10 h-10 animate-bounce" />
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white tracking-tighter uppercase italic">Atenção Crítica!</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Você está prestes a <span className="text-red-400 font-bold uppercase">apagar permanentemente</span> todo o histórico de trades e eventos do monitor. Esta ação não pode ser desfeita.
+                </p>
+              </div>
+
+              <div className="flex flex-col w-full gap-3 pt-4">
+                <button 
+                  onClick={handleResetData}
+                  disabled={resetting}
+                  className="w-full py-4 bg-red-500 text-black text-xs font-black rounded-2xl hover:bg-red-600 transition-all flex items-center justify-center gap-2"
+                >
+                  {resetting ? <Activity className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  {resetting ? 'LIMPANDO...' : 'SIM, APAGAR TUDO AGORA'}
+                </button>
+                <button 
+                  onClick={() => setShowResetModal(false)}
+                  disabled={resetting}
+                  className="w-full py-4 bg-white/5 text-gray-400 text-xs font-bold rounded-2xl hover:text-white transition-all"
+                >
+                  CANCELAR E VOLTAR
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
       )}
 
@@ -560,7 +684,7 @@ export default function SettingsPage() {
                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
                         Lookback Histórico (Velas)
                         <InfoTooltip title={SETTINGS_HELP.trend_candles.title} content={SETTINGS_HELP.trend_candles.content} />
-                     </label>
+                      </label>
                        <input 
                           type="number" 
                           value={settings.analysis?.trend_candles || 200}
@@ -572,7 +696,7 @@ export default function SettingsPage() {
                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
                         Slope Mínimo (Pontos)
                         <InfoTooltip title={SETTINGS_HELP.slope_min.title} content={SETTINGS_HELP.slope_min.content} />
-                     </label>
+                      </label>
                        <input 
                           type="number" step="0.01"
                           value={settings.signal_logic?.trend_min_slope_points || 0.20}
@@ -620,80 +744,68 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
-                      Timeframe Tendência
-                      <InfoTooltip title={SETTINGS_HELP.trend_timeframe.title} content={SETTINGS_HELP.trend_timeframe.content} />
-                   </label>
-                   <select 
-                      value={settings.signal_logic?.trend_timeframe || 'H1'}
-                      onChange={(e) => updateNested('signal_logic', 'trend_timeframe', e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
-                   >
-                      {['W1', 'D1', 'H4','H1','M30','M15'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                   </select>
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
-                      Timeframe Entrada
-                      <InfoTooltip title={SETTINGS_HELP.entry_timeframe.title} content={SETTINGS_HELP.entry_timeframe.content} />
-                   </label>
-                   <select 
-                      value={settings.signal_logic?.entry_timeframe || 'M15'}
-                      onChange={(e) => updateNested('signal_logic', 'entry_timeframe', e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
-                   >
-                      {['M30','M15','M5','M1'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                   </select>
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
-                    Breakout Buffer (Pts)
-                    <InfoTooltip title={SETTINGS_HELP.breakout_buffer.title} content={SETTINGS_HELP.breakout_buffer.content} />
-                  </label>
-                   <input 
-                      type="number"
-                      value={settings.signal_logic?.breakout_buffer_points || 10}
-                      onChange={(e) => updateNested('signal_logic', 'breakout_buffer_points', parseInt(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
-                   />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
-                    S/R Tolerance (Pts)
-                    <InfoTooltip title={SETTINGS_HELP.sr_tolerance.title} content={SETTINGS_HELP.sr_tolerance.content} />
-                  </label>
-                   <input 
-                      type="number"
-                      value={settings.signal_logic?.sr_tolerance_points || 35}
-                      onChange={(e) => updateNested('signal_logic', 'sr_tolerance_points', parseInt(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
-                   />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
-                     Triângulo Fimathe (M1 Velas)
-                     <InfoTooltip title={SETTINGS_HELP.triangle_m1.title} content={SETTINGS_HELP.triangle_m1.content} />
-                   </label>
-                   <input 
-                      type="number"
-                      value={settings.signal_logic?.triangle_m1_candles || 10}
-                      onChange={(e) => updateNested('signal_logic', 'triangle_m1_candles', parseInt(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
-                   />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
-                     Modo Take Profit (Nível)
-                     <InfoTooltip title={SETTINGS_HELP.target_level.title} content={SETTINGS_HELP.target_level.content} />
-                   </label>
-                   <select 
-                      value={settings.signal_logic?.target_level_mode || '80'}
-                      onChange={(e) => updateNested('signal_logic', 'target_level_mode', e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
-                   >
-                      {['50','80','85','100'].map(lvl => <option key={lvl} value={lvl}>{lvl}%</option>)}
-                   </select>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                        Timeframe Tendência
+                        <InfoTooltip title={SETTINGS_HELP.trend_timeframe.title} content={SETTINGS_HELP.trend_timeframe.content} />
+                    </label>
+                    <select 
+                        value={settings.signal_logic?.trend_timeframe || 'H1'}
+                        onChange={(e) => updateNested('signal_logic', 'trend_timeframe', e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
+                    >
+                        {['W1', 'D1', 'H4','H1','M30','M15'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                        Timeframe Entrada
+                        <InfoTooltip title={SETTINGS_HELP.entry_timeframe.title} content={SETTINGS_HELP.entry_timeframe.content} />
+                    </label>
+                    <select 
+                        value={settings.signal_logic?.entry_timeframe || 'M15'}
+                        onChange={(e) => updateNested('signal_logic', 'entry_timeframe', e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
+                    >
+                        {['M30','M15','M5','M1'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                      Breakout Buffer (Pts)
+                      <InfoTooltip title={SETTINGS_HELP.breakout_buffer.title} content={SETTINGS_HELP.breakout_buffer.content} />
+                    </label>
+                    <input 
+                        type="number"
+                        value={settings.signal_logic?.breakout_buffer_points || 10}
+                        onChange={(e) => updateNested('signal_logic', 'breakout_buffer_points', parseInt(e.target.value))}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                      S/R Tolerance (Pts)
+                      <InfoTooltip title={SETTINGS_HELP.sr_tolerance.title} content={SETTINGS_HELP.sr_tolerance.content} />
+                    </label>
+                    <input 
+                        type="number"
+                        value={settings.signal_logic?.sr_tolerance_points || 35}
+                        onChange={(e) => updateNested('signal_logic', 'sr_tolerance_points', parseInt(e.target.value))}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                      Triângulo Fimathe (M1 Velas)
+                      <InfoTooltip title={SETTINGS_HELP.triangle_m1.title} content={SETTINGS_HELP.triangle_m1.content} />
+                    </label>
+                    <input 
+                        type="number"
+                        value={settings.signal_logic?.triangle_m1_candles || 10}
+                        onChange={(e) => updateNested('signal_logic', 'triangle_m1_candles', parseInt(e.target.value))}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
+                    />
+                  </div>
                 </div>
               </div>
             </section>
@@ -799,7 +911,10 @@ export default function SettingsPage() {
                 <Shield className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-white tracking-tight">Gestão de Exposição e Risco</h3>
+                <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                  Gestão de Exposição e Risco
+                  <InfoTooltip title="Escudo da Conta" content="Define quanto do seu dinheiro o robô pode usar e como ele protege seus ganhos. É o coração da segurança da sua operação." />
+                </h3>
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Proteção do capital e limites</p>
               </div>
             </div>
@@ -813,40 +928,49 @@ export default function SettingsPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
-                  { id: 'standard', name: 'Padrão (FIM-010)', desc: 'BE aos 50%', icon: ShieldCheck, color: 'text-gray-400' },
-                  { id: 'conservative', name: 'Conservador', desc: 'FIM-017 (B.E Fixo)', icon: Shield, color: 'text-primary' },
-                  { id: 'infinity', name: 'Infinity', desc: 'FIM-018 (Arraste)', icon: Zap, color: 'text-accent' }
+                  { id: 'standard', name: 'Padrão (FIM-010)', desc: 'BE aos 50%', icon: ShieldCheck, help: SETTINGS_HELP.mode_standard },
+                  { id: 'conservative', name: 'Conservador', desc: 'FIM-017 (B.E Fixo)', icon: Shield, help: SETTINGS_HELP.mode_conservative },
+                  { id: 'infinity', name: 'Infinity', desc: 'FIM-018 (Arraste)', icon: Zap, help: SETTINGS_HELP.mode_infinity }
                 ].map((mode) => (
-                  <button
+                  <motion.button
                     key={mode.id}
                     onClick={() => applyManagementStrategy(mode.id)}
-                    className={`glass p-6 rounded-[32px] border transition-all text-left group relative overflow-hidden ` + (
+                    whileHover={{ scale: 1.02, boxShadow: '0 0 20px rgba(0,212,255,0.1)' }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`glass p-6 rounded-[32px] border transition-all text-left group relative ${
                       settings.risk_management?.fimathe_management_mode === mode.id
-                        ? 'border-primary/50 bg-primary/5'
+                        ? 'border-primary shadow-[0_0_20px_rgba(34,211,238,0.15)] bg-primary/[0.03]'
                         : 'border-white/5 hover:border-primary/20 hover:bg-white/[0.02]'
-                    )}
+                    }`}
                   >
-                    {settings.risk_management?.fimathe_management_mode === mode.id && (
-                      <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary/10 blur-3xl rounded-full" />
-                    )}
+                    {/* Contêiner para Brilho Animado (Overflow isolado para permitir tooltips externos) */}
+                    <div className="absolute inset-0 overflow-hidden rounded-[32px] pointer-events-none">
+                      {settings.risk_management?.fimathe_management_mode === mode.id && (
+                        <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary/15 blur-3xl rounded-full animate-pulse" />
+                      )}
+                    </div>
+
+                    <div className="absolute top-4 right-4 z-50">
+                       <InfoTooltip title={mode.help.title} content={mode.help.content} direction="down" />
+                    </div>
                     
-                    <div className={`p-3 rounded-2xl w-fit mb-4 transition-all ` + (
+                    <div className={`p-3 rounded-2xl w-fit mb-4 transition-all ${
                       settings.risk_management?.fimathe_management_mode === mode.id 
-                        ? 'bg-primary/20 ' + mode.color 
+                        ? 'bg-primary shadow-[0_0_15px_rgba(34,211,238,0.4)] text-black' 
                         : 'bg-white/5 text-gray-500'
-                    )}>
+                    }`}>
                       <mode.icon className="w-5 h-5" />
                     </div>
                     
-                    <h4 className={`text-xs font-black uppercase tracking-tighter mb-1 ` + (
-                      settings.risk_management?.fimathe_management_mode === mode.id ? 'text-white' : 'text-gray-400'
-                    )}>
+                    <h4 className={`text-xs font-black uppercase tracking-tighter mb-1 ${
+                      settings.risk_management?.fimathe_management_mode === mode.id ? 'text-white' : 'text-gray-400 font-bold'
+                    }`}>
                       {mode.name}
                     </h4>
                     <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-none">
                       {mode.desc}
                     </p>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>
@@ -877,7 +1001,9 @@ export default function SettingsPage() {
                             Ciclo Fimathe Ativo
                             <InfoTooltip title={SETTINGS_HELP.fimathe_cycle.title} content={SETTINGS_HELP.fimathe_cycle.content} />
                           </span>
-                          <span className="text-[10px] text-gray-500">Trailing dinâmico 50/80/100</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                            Trava Atual: {settings.signal_logic?.fimathe_cycle_top_level || '80'}% do Ciclo
+                          </span>
                        </div>
                        <input 
                         type="checkbox" 
@@ -893,8 +1019,31 @@ export default function SettingsPage() {
                          animate={{ opacity: 1, height: 'auto' }}
                          className="p-6 bg-primary/5 rounded-[40px] border border-primary/10 space-y-6 mt-4"
                        >
+                          <div className="space-y-3">
+                             <label className="text-[10px] font-bold text-primary uppercase ml-1 flex items-center gap-1.5 tracking-widest">
+                               <Target className="w-3.5 h-3.5" />
+                               Alvo de Travamento (%)
+                               <InfoTooltip title={SETTINGS_HELP.target_level.title} content={SETTINGS_HELP.target_level.content} />
+                             </label>
+                             <div className="grid grid-cols-6 gap-2 bg-black/40 p-1.5 rounded-[24px] border border-white/5">
+                               {['50', '80', '85', '90', '95', '100'].map((lvl) => (
+                                 <button
+                                   key={lvl}
+                                   onClick={() => updateNested('signal_logic', 'fimathe_cycle_top_level', lvl)}
+                                   className={`py-2.5 rounded-2xl text-[10px] font-black transition-all duration-300 ${
+                                     (settings.signal_logic?.fimathe_cycle_top_level || '80') === lvl
+                                       ? 'bg-primary text-black shadow-[0_0_15px_rgba(34,211,238,0.3)]'
+                                       : 'text-gray-500 hover:text-white hover:bg-white/5'
+                                   }`}
+                                 >
+                                   {lvl}%
+                                 </button>
+                               ))}
+                             </div>
+                          </div>
+
                           <div className="space-y-2">
-                             <label className="text-[10px] font-bold text-primary uppercase ml-1 flex items-center gap-1">
+                             <label className="text-[10px] font-bold text-primary uppercase ml-1 flex items-center gap-1.5 tracking-widest">
                                <Zap className="w-3.5 h-3.5" />
                                Modo de Arraste (FIM-017/018)
                                <InfoTooltip title={SETTINGS_HELP.management_mode.title} content={SETTINGS_HELP.management_mode.content} />
@@ -902,7 +1051,7 @@ export default function SettingsPage() {
                              <select 
                                value={settings.risk_management?.fimathe_management_mode || 'standard'}
                                onChange={(e) => updateNested('risk_management', 'fimathe_management_mode', e.target.value)}
-                               className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                               className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary appearance-none cursor-pointer hover:border-primary/50 transition-colors"
                              >
                                <option value="standard">Padrão: BE 50% + Lock 50%</option>
                                <option value="conservative">Conservador: FIM-017 (BE Fixo)</option>
@@ -920,7 +1069,7 @@ export default function SettingsPage() {
                                  type="number"
                                  value={settings.risk_management?.fimathe_be_trigger_percent || 50}
                                  onChange={(e) => updateNested('risk_management', 'fimathe_be_trigger_percent', parseInt(e.target.value))}
-                                 className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary"
+                                 className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary"
                                />
                              </div>
 
@@ -934,7 +1083,7 @@ export default function SettingsPage() {
                                    type="number"
                                    value={settings.risk_management?.fimathe_trail_step_percent || 100}
                                    onChange={(e) => updateNested('risk_management', 'fimathe_trail_step_percent', parseInt(e.target.value))}
-                                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary"
+                                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary"
                                  />
                                </div>
                              )}
@@ -943,8 +1092,11 @@ export default function SettingsPage() {
                     )}
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-white">Break-even Automático</span>
-                          <span className="text-[10px] text-gray-500">Mover para entrada após 1º nível</span>
+                          <span className="text-sm font-bold text-white flex items-center">
+                            Break-even Automático
+                            <InfoTooltip title={SETTINGS_HELP.be_automativo.title} content={SETTINGS_HELP.be_automativo.content} />
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Entrada Protegida (0x0)</span>
                        </div>
                        <input 
                         type="checkbox" 
@@ -953,6 +1105,35 @@ export default function SettingsPage() {
                         className="w-10 h-10 accent-primary cursor-pointer" 
                       />
                     </div>
+
+                    {settings.risk_management?.use_breakeven && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="p-5 bg-secondary/5 rounded-[32px] border border-secondary/10 space-y-4"
+                        >
+                            <label className="text-[10px] font-bold text-secondary uppercase ml-1 flex items-center gap-1.5 tracking-widest">
+                               <ShieldCheck className="w-3.5 h-3.5" />
+                               Gordurinha de Lucro (Pontos)
+                               <InfoTooltip title={SETTINGS_HELP.be_offset.title} content={SETTINGS_HELP.be_offset.content} />
+                            </label>
+                            <div className="grid grid-cols-4 gap-2">
+                               {[5, 10, 15, 20, 25, 30, 35, 40].map((pts) => (
+                                   <button
+                                     key={pts}
+                                     onClick={() => updateNested('risk_management', 'fimathe_cycle_breakeven_offset_points', pts)}
+                                     className={`py-2 rounded-xl text-[10px] font-black transition-all ${
+                                       (settings.risk_management?.fimathe_cycle_breakeven_offset_points || 0) === pts
+                                         ? 'bg-secondary text-black shadow-[0_0_10px_rgba(244,114,182,0.3)]'
+                                         : 'bg-white/5 text-gray-500 hover:text-white'
+                                     }`}
+                                   >
+                                     +{pts}
+                                   </button>
+                               ))}
+                            </div>
+                        </motion.div>
+                    )}
                  </div>
               </div>
 
@@ -1113,18 +1294,78 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">Auto-Limpeza de Logs (Minutos)</label>
+                <div className="flex p-1.5 bg-black/40 rounded-2xl border border-white/5">
+                   <button 
+                     onClick={() => updateNested('log_management', 'mode', 'minutes')}
+                     className={`flex-1 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${
+                       (settings.log_management?.mode || 'minutes') === 'minutes' 
+                         ? 'bg-red-500 text-black shadow-[0_0_20px_rgba(239,68,68,0.3)]' 
+                         : 'text-gray-500 hover:text-white'
+                     }`}
+                   >
+                     Por Tempo
+                   </button>
+                   <button 
+                     onClick={() => updateNested('log_management', 'mode', 'quantity')}
+                     className={`flex-1 py-3 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${
+                       (settings.log_management?.mode === 'quantity') 
+                         ? 'bg-red-500 text-black shadow-[0_0_20px_rgba(239,68,68,0.3)]' 
+                         : 'text-gray-500 hover:text-white'
+                     }`}
+                   >
+                     Por Quantidade
+                   </button>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest">
+                    {settings.log_management?.mode === 'quantity' ? 'Manter os últimos (Quantidade)' : 'Janela de Limpeza (Minutos)'}
+                  </label>
                   <div className="relative">
                     <input 
                       type="number"
-                      value={settings.ui_settings?.log_cleanup_minutes || 0}
-                      onChange={(e) => updateNested('ui_settings', 'log_cleanup_minutes', parseInt(e.target.value))}
+                      value={settings.log_management?.value || 0}
+                      onChange={(e) => updateNested('log_management', 'value', parseInt(e.target.value))}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-red-500"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 tracking-tighter uppercase">Min</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 tracking-tighter uppercase">
+                      {settings.log_management?.mode === 'quantity' ? 'Log' : 'Min'}
+                    </span>
                   </div>
-                  <p className="text-[9px] text-gray-600 ml-2 italic">* O robô limpará logs mais antigos que o tempo definido. Use 0 para desativar.</p>
+                  <p className="text-[9px] text-gray-500 ml-2 italic leading-relaxed">
+                    {settings.log_management?.mode === 'quantity' 
+                      ? `* Serão preservados apenas os ${settings.log_management?.value || 0} registros mais recentes no banco de dados.` 
+                      : `* Logs anteriores a ${settings.log_management?.value || 0} minutos serão removidos automaticamente.`}
+                    {" "}Use 0 para desativar.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* NEW: DANGER ZONE SECTION */}
+            <section className="glass p-10 rounded-[48px] border border-red-500/10 bg-red-500/[0.01] space-y-8 lg:col-span-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500">
+                    <ShieldAlert className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white tracking-tight italic">ZONA DE RISCO</h3>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Operações críticas e destrutivas</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:items-end gap-2">
+                  <button 
+                    onClick={() => setShowResetModal(true)}
+                    className="px-8 py-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl text-xs font-black hover:bg-red-500 hover:text-black transition-all group overflow-hidden relative"
+                  >
+                    <div className="flex items-center gap-2 relative z-10">
+                      <Trash2 className="w-4 h-4 group-hover:animate-bounce" /> RESET TOTAL DE DADOS 
+                    </div>
+                    <div className="absolute inset-0 bg-red-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                  </button>
+                  <span className="text-[9px] text-gray-600 font-bold uppercase tracking-wider text-right">Esta ação é irreversível</span>
                 </div>
               </div>
             </section>

@@ -13,6 +13,8 @@ def normalize_cycle_context(raw):
         "projection_50": _to_float(raw.get("projection_50")),
         "projection_80": _to_float(raw.get("projection_80")),
         "projection_85": _to_float(raw.get("projection_85")),
+        "projection_90": _to_float(raw.get("projection_90")),
+        "projection_95": _to_float(raw.get("projection_95")),
         "projection_100": _to_float(raw.get("projection_100")),
     }
 
@@ -50,6 +52,10 @@ def _crossed_back_from_level(side, previous_price, current_price, level):
 def _top_reference(context, top_level):
     if str(top_level) == "100":
         return context.get("projection_100")
+    if str(top_level) == "95":
+        return context.get("projection_95")
+    if str(top_level) == "90":
+        return context.get("projection_90")
     if str(top_level) == "85":
         return context.get("projection_85")
     return context.get("projection_80")

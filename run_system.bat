@@ -7,8 +7,11 @@ echo ============================================================
 echo.
 
 :: 1. Subindo infraestrutura Docker
-echo [1/3] Iniciando Banco de Dados e Dashboard (Docker)...
-docker-compose up -d
+set "BUILD_FLAG="
+if "%~1"=="--build" set "BUILD_FLAG=--build"
+
+echo [1/3] Iniciando Banco de Dados e Dashboard (Docker)!BUILD_FLAG!...
+docker-compose up -d %BUILD_FLAG%
 if %ERRORLEVEL% NEQ 0 (
     echo [ERRO] Falha ao iniciar containers. Certifique-se que o Docker está rodando.
     pause

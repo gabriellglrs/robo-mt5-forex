@@ -39,7 +39,7 @@ function StatsCard({ title, value, subValue, icon: Icon, color }: any) {
         </div>
         <div className="flex items-center gap-1.5 text-[9px] font-black text-primary bg-primary/10 px-3 py-1.5 rounded-full uppercase tracking-widest border border-primary/20">
           <div className="w-1 h-1 rounded-full bg-primary animate-ping" />
-          Live
+          AO VIVO
         </div>
       </div>
       
@@ -116,6 +116,14 @@ export default function DashboardPage() {
   const openTrades = metrics?.recent_trades.filter(t => t.status === 'OPEN') || [];
   const closedTrades = metrics?.recent_trades.filter(t => t.status === 'CLOSED') || [];
 
+  // Cálculo de Offset dinâmico para o gradiente (Verde acima de 0, Vermelho abaixo)
+  const pnlValues = chartData.map(d => d.pnl);
+  const maxPnl = Math.max(...pnlValues, 0);
+  const minPnl = Math.min(...pnlValues, 0);
+  
+  // O offset define onde a cor muda (0 na escala do eixo Y)
+  const off = maxPnl === minPnl ? 0 : maxPnl / (maxPnl - minPnl);
+
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       {/* Header Section */}
@@ -162,8 +170,10 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-            <div className="lg:col-span-2 glass p-10 rounded-[48px] border border-white/5 overflow-hidden">
-              <div className="flex justify-between items-center mb-10">
+            <div className="lg:col-span-2 glass p-10 rounded-[48px] border border-white/5 overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[120px] -mr-32 -mt-32" />
+              
+              <div className="flex justify-between items-center mb-10 relative z-10">
                 <div>
                   <h3 className="text-xl font-bold text-white tracking-tight">Curva de Equity</h3>
                   <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">Evolução do Saldo Projetado</p>
@@ -172,29 +182,35 @@ export default function DashboardPage() {
                   <span className="px-4 py-1.5 rounded-full bg-white/5 text-[9px] text-gray-400 font-black border border-white/5 uppercase tracking-tighter">Histórico de Ordens</span>
                 </div>
               </div>
-              <div className="h-[320px] w-full">
+              <div className="h-[320px] w-full relative z-10">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
                     <defs>
-                      <linearGradient id="colorPnl" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00FFAA" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#00FFAA" stopOpacity={0}/>
+                      <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset={off} stopColor="#00FFAA" stopOpacity={0.4} />
+                        <stop offset={off} stopColor="#EF4444" stopOpacity={0.4} />
+                      </linearGradient>
+                      <linearGradient id="strokeColor" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset={off} stopColor="#00FFAA" stopOpacity={1} />
+                        <stop offset={off} stopColor="#EF4444" stopOpacity={1} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={['auto', 'auto']} />
                     <Tooltip 
-                      contentStyle={{ background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }}
-                      itemStyle={{ color: '#00FFAA' }}
+                      contentStyle={{ background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+                      itemStyle={{ fontStyle: 'bold' }}
+                      labelStyle={{ color: '#666', fontSize: '10px', fontWeight: 'bold', marginBottom: '4px' }}
+                      formatter={(value: any) => [`$ ${Number(value || 0).toFixed(2)}`, 'Equity']}
                     />
                     <Area 
                       type="monotone" 
                       dataKey="pnl" 
-                      stroke="#00FFAA" 
+                      stroke="url(#strokeColor)" 
                       strokeWidth={4}
                       fillOpacity={1} 
-                      fill="url(#colorPnl)" 
+                      fill="url(#splitColor)" 
                       animationDuration={1500}
                     />
                   </AreaChart>
@@ -210,7 +226,7 @@ export default function DashboardPage() {
                       <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-primary animate-pulse" /> Posições Abertas
                       </h3>
-                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5 ml-4">Monitoramento Live</p>
+                      <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5 ml-4">Monitoramento Ao Vivo</p>
                     </div>
                     <div className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider border border-primary/20 shadow-sm">
                       {openTrades.length} Ativo{openTrades.length > 1 ? 's' : ''}
@@ -230,7 +246,7 @@ export default function DashboardPage() {
                           <div>
                             <div className="flex items-center gap-2 mb-0.5">
                               <h4 className="text-xs font-bold text-white">{trade.symbol}</h4>
-                              <span className="text-[8px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-black tracking-widest border border-primary/30 shadow-[0_0_8px_rgba(0,255,170,0.2)]">Livre</span>
+                              <span className="text-[8px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-black tracking-widest border border-primary/30 shadow-[0_0_8px_rgba(0,255,170,0.2)]">AO VIVO</span>
                             </div>
                             <p className="text-[10px] text-gray-400">Posição Aberta</p>
                           </div>

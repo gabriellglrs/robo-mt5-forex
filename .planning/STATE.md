@@ -5,9 +5,9 @@ milestone_name: Aderência Total Fimathe
 status: active
 last_updated: "2026-04-17T13:28:00.000Z"
 progress:
-  total_phases: 21
-  completed_phases: 20
-  percent: 95
+  total_phases: 22
+  completed_phases: 21
+  percent: 96
 ---
 
 # Project State: robo-mt5-v2
@@ -22,6 +22,7 @@ Projeto com Phase 20 finalizada. O motor de execução `fimathe_cycle.py` agora 
 - [x] Phase 18: Trailing Purista (FIM-010)
 - [x] Phase 19: UX Educativo (Tooltips Globais)
 - [x] Phase 20: Stop Loss Estratégico (FIM-017 / FIM-018)
+- [x] Phase 20.1: Hotfix de Sincronização e Reconciliação
 - [ ] Phase 21: Conexão MT5 e Status em Real-time
 
 ## Estado Atual
