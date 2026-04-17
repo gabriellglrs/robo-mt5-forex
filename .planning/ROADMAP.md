@@ -149,7 +149,34 @@ Plans:
 4. KPIs principais: Profit Factor, Payoff e Drawdown Máximo calculados pelo Backend.
 
 ---
-**Status Atual**: Fase 14 CONCLUÍDA. Conformidade Fimathe 100% Validada (FIM-001 até FIM-016).
+---
+**Status Atual**: Milestone 2 CONCLUÍDO. Conformidade Fimathe 100% Validada (FIM-001 até FIM-016) e Performance BI Entregue. Iniciando Milestone 3.
+
+## Milestone 3: Expansão Operacional & Conectividade (Ativo)
+
+### Phase 18: Conexão MT5 Operacional via UI
+**Goal**: Tornar a configuração de conexão com o MetaTrader 5 (Servidor, Login, Senha) totalmente funcional através da interface web, com teste de conexão em tempo real.
+**Depends on**: Phase 17
+**Success Criteria**:
+1. Formulário de conexão em `/settings` salva dados válidos no `config.json`.
+2. Botão "Testar Conexão" no Frontend retorna sucesso/erro do MT5 via Backend.
+3. Robô inicia/para o terminal MT5 automaticamente baseado nas credenciais salvas.
+
+### Phase 19: Validação de Ativos e Regras da Corretora
+**Goal**: Implementar camada de pré-validação técnica antes de abrir qualquer ordem, respeitando limites da corretora.
+**Depends on**: Phase 18
+**Success Criteria**:
+1. Verificação automática de `volume_min`, `volume_step` e `stops_level`.
+2. Bloqueio de ordens se spread for maior que o limite configurado.
+3. Log explícito de por que uma ordem foi rejeitada pela pré-validação.
+
+### Phase 20: Painel de Execução e Reconciliação
+**Goal**: Oferecer transparência total sobre o que acontece entre o robô e o MT5, com ferramentas de correção de divergências.
+**Depends on**: Phase 19
+**Success Criteria**:
+1. Tela de Logs mostra o `retcode` original do MT5 para cada tentativa de ordem.
+2. Ferramenta de Reconciliação detecta se posição no MT5 não bate com a tabela `trades` local.
+3. Botão de "Sincronizar" para ajustar o estado do robô à realidade da conta.
 
 ## Backlog Futuro: Web Next.js (nao executar agora)
 

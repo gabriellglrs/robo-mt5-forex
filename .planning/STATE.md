@@ -1,14 +1,12 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
+milestone_name: Aderência Total Fimathe
 status: active
-last_updated: "2026-04-16T16:10:00.000Z"
+last_updated: "2026-04-17T13:28:00.000Z"
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 8
-  completed_plans: 8
+  total_phases: 17
+  completed_phases: 17
   percent: 100
 ---
 
