@@ -502,7 +502,12 @@ def apply_trailing_management(
                 has_change = True
 
         # 3) Trailing de TP
-        if trailing_cfg["tp_enabled"] and profit_points >= trailing_cfg["activation_points"]:
+        is_infinite = trailing_cfg.get("fimathe_management_mode") == "infinity"
+        if is_infinite:
+            if current_tp is not None and current_tp > 0:
+                new_tp = 0.0
+                has_change = True
+        elif trailing_cfg["tp_enabled"] and profit_points >= trailing_cfg["activation_points"]:
             if pos.type == mt5.POSITION_TYPE_BUY:
                 candidate_tp = current_price + (trailing_cfg["tp_distance_points"] * point)
             else:

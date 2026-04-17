@@ -5,34 +5,28 @@ milestone_name: Aderência Total Fimathe
 status: active
 last_updated: "2026-04-17T13:28:00.000Z"
 progress:
-  total_phases: 17
-  completed_phases: 17
-  percent: 100
+  total_phases: 21
+  completed_phases: 20
+  percent: 95
 ---
 
 # Project State: robo-mt5-v2
 
 ## Contexto Atual
 
-Projeto com Phase 8 finalizada. O motor de decisÃ£o Fimathe foi desacoplado para um motor de estados dedicado (`fimathe_state_engine.py`), com cobertura de testes unitÃ¡rios e funcional.
+Projeto com Phase 20 finalizada. O motor de execução `fimathe_cycle.py` agora é um sistema de gestão dinâmica completo, suportando modos Padrão, Conservador e Infinity, com total transparência via Academy e Dashboard.
 
-## Status das Fases
+## Status das Fases (Recentes)
 
-- [x] Phase 1 a 6: Base operacional historica
-- [x] Phase 7: Implementacao Fimathe concluida
-- [x] Phase 8: Motor de estados Fimathe
-- [x] Phase 9: Gestao de risco Fimathe
-- [x] Phase 10: UX/configuracoes completas
-- [x] Phase 11: HomologaÃ§Ã£o e Testes (Compliance Manual)
-- [x] Phase 12: Monitor de ExecuÃ§Ã£o Advanced UI/UX
-- [x] Phase 13: TransparÃªncia Financeira (Profit Monitoring)
-- [x] Phase 14: Hardening EstratÃ©gico
-- [x] Phase 16: Central de Educação (Fimathe Academy)
-- [x] Phase 17: Dashboard de Performance e Insights (BI)
+- [x] Phase 1 a 17: BI, Performance e Core
+- [x] Phase 18: Trailing Purista (FIM-010)
+- [x] Phase 19: UX Educativo (Tooltips Globais)
+- [x] Phase 20: Stop Loss Estratégico (FIM-017 / FIM-018)
+- [ ] Phase 21: Conexão MT5 e Status em Real-time
 
 ## Estado Atual
-**Fase 17 Shipped** — Nova central de inteligência (BI) disponível na rota `/stats`. O sistema agora calcula automaticamente Fator de Lucro, Payoff, Drawdown Máximo e distribuição de lucro por ativo.
-A Dashboard principal permanece focada em execução, enquanto a nova área fornece insights profundos para gestão de risco e performance.
+**Fase 20 Shipped** — O robô atingiu um novo nível de controle de risco. Implementamos as regraspuristas FIM-017 (BE Fixo) e FIM-018 (Infinity Trail). Além da lógica no motor Python, toda a interface web foi adaptada para permitir ajustes manuais de porcentagem, com o suporte didático da Academy integrada.
+A suíte de testes unitários v2 garante que as novas regras não conflitam com a gestão clássica da Fimathe.
 
 ## Entregas fechadas na Phase 7
 - SPEC e Gap Analysis consolidados.

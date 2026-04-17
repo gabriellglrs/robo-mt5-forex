@@ -180,6 +180,26 @@ const ACADEMY_RULES = [
     danger: 'Média móvel com Slope positivo pode indicar apenas uma correção de curto prazo se não houver quebra de estrutura técnica.',
     proTip: 'Ative a FIM-016 para operações de longo prazo (Swing Trading) onde a estrutura é mais importante que o momentum.',
     icon: Layers
+  },
+  {
+    id: 'FIM-017',
+    name: 'Gestão Conservadora (0x0)',
+    category: 'Gestão de Risco',
+    theory: 'A prioridade absoluta é proteger o capital. Travar a operação no 0x0 retira o peso psicológico do risco.',
+    logic: 'Move o stop para o Break-even assim que o gatilho percentual configurado é atingido e congela o arraste.',
+    danger: 'Em mercados muito voláteis, travar no 0x0 cedo demais pode te tirar de um trade que ainda teria lucro.',
+    proTip: 'Ideal para traders que preferem segurança máxima e alvos fixos bem definidos (80-100%).',
+    icon: ShieldCheck
+  },
+  {
+    id: 'FIM-018',
+    name: 'Gestão Progressiva (Infinity)',
+    category: 'Gestão de Risco',
+    theory: 'O mercado pode entregar movimentos gigantes. Limitar o lucro a um nível fixo pode ser um custo de oportunidade.',
+    logic: 'Remove o Take Profit fixo e move o Stop Loss nível a nível (arraste de 50/100%) seguindo a expansão infinita.',
+    danger: 'Sem TP fixo, você depende da reversão do preço para fechar o trade, o que pode devolver parte do lucro no topo.',
+    proTip: 'Use em ativos com tendência forte (XAUUSD, Índices) para capturar movimentos de múltiplos canais.',
+    icon: Zap
   }
 ];
 

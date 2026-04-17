@@ -245,6 +245,18 @@ const SETTINGS_HELP = {
   
   // Misc
   triangle_m1: { title: "Triângulo M1", content: "Quantidade de velas no M1 para validar a consolidação (triângulo) antes de uma entrada ou reversão." },
+  management_mode: { 
+    title: "Modo de Gestão (FIM-017/018)", 
+    content: "Define como o Stop Loss será arrastado. 'Conservador' trava no 0x0 e não move mais. 'Infinity' remove o Take Profit e arrasta o stop nível a nível para sempre." 
+  },
+  be_trigger: { 
+    title: "Gatilho de Break-even (%)", 
+    content: "Define a porcentagem do primeiro canal que o preço deve atingir para o robô mover o Stop para o preço de entrada (0x0). Recomendado: 50%." 
+  },
+  trail_step: { 
+    title: "Passo do Infinity (%)", 
+    content: "No modo Infinity, define a cada quantos % do canal o Stop deve avançar. Ex: 100% significa que o SL segue 1 nível atrás do preço atual." 
+  },
 };
 
 export default function SettingsPage() {
@@ -799,6 +811,61 @@ export default function SettingsPage() {
                         className="w-10 h-10 accent-primary cursor-pointer" 
                       />
                     </div>
+
+                    {settings.risk_management?.fimathe_cycle_enabled && (
+                       <motion.div 
+                         initial={{ opacity: 0, height: 0 }}
+                         animate={{ opacity: 1, height: 'auto' }}
+                         className="p-6 bg-primary/5 rounded-[40px] border border-primary/10 space-y-6 mt-4"
+                       >
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-primary uppercase ml-1 flex items-center gap-1">
+                               <Zap className="w-3.5 h-3.5" />
+                               Modo de Arraste (FIM-017/018)
+                               <InfoTooltip title={SETTINGS_HELP.management_mode.title} content={SETTINGS_HELP.management_mode.content} />
+                             </label>
+                             <select 
+                               value={settings.risk_management?.fimathe_management_mode || 'standard'}
+                               onChange={(e) => updateNested('risk_management', 'fimathe_management_mode', e.target.value)}
+                               className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                             >
+                               <option value="standard">Padrão: BE 50% + Lock 50%</option>
+                               <option value="conservative">Conservador: FIM-017 (BE Fixo)</option>
+                               <option value="infinity">Infinity: FIM-018 (Arraste)</option>
+                             </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                               <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 flex items-center">
+                                 Gatilho 0x0 (%)
+                                 <InfoTooltip title={SETTINGS_HELP.be_trigger.title} content={SETTINGS_HELP.be_trigger.content} />
+                               </label>
+                               <input 
+                                 type="number"
+                                 value={settings.risk_management?.fimathe_be_trigger_percent || 50}
+                                 onChange={(e) => updateNested('risk_management', 'fimathe_be_trigger_percent', parseInt(e.target.value))}
+                                 className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary"
+                               />
+                             </div>
+
+                             {settings.risk_management?.fimathe_management_mode === 'infinity' && (
+                               <div className="space-y-2">
+                                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 flex items-center">
+                                   Passo Arraste (%)
+                                   <InfoTooltip title={SETTINGS_HELP.trail_step.title} content={SETTINGS_HELP.trail_step.content} />
+                                 </label>
+                                 <input 
+                                   type="number"
+                                   value={settings.risk_management?.fimathe_trail_step_percent || 100}
+                                   onChange={(e) => updateNested('risk_management', 'fimathe_trail_step_percent', parseInt(e.target.value))}
+                                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-primary"
+                                 />
+                               </div>
+                             )}
+                          </div>
+                       </motion.div>
+                    )}
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                        <div className="flex flex-col">
                           <span className="text-sm font-bold text-white">Break-even Automático</span>

@@ -167,15 +167,16 @@ Plans:
 2. Descrições detalhadas e didáticas baseadas na estratégia Fimathe para cada parâmetro.
 3. Componente de visualização padronizado e premium.
 
-### Phase 20: Conexão MT5 Operacional via UI
-**Goal**: Tornar a configuração de conexão com o MetaTrader 5 (Servidor, Login, Senha) totalmente funcional através da interface web.
-...
-### Phase 20: Validação de Ativos e Regras da Corretora
-...
-### Phase 21: Painel de Execução e Reconciliação
-...
+### Phase 20: Stop Loss Estratégico (FIM-017, FIM-018) [COMPLETED]
+**Goal**: Implementar as novas regras de Stop Loss Purista (FIM-017 e FIM-018) para maior segurança e lucratividade.
+**Depends on**: Phase 19
+**Success Criteria**:
+1. Lógica FIM-017 implementada no motor de execução.
+2. Lógica FIM-018 implementada no motor de execução.
+3. Configurações visuais e tooltips adicionados para as novas regras.
 
-## Backlog Futuro: Web Next.js (nao executar agora)
+### Phase 21: Conexão MT5 Operacional via UI
+**Goal**: Tornar a configuração de conexão com o MetaTrader 5 (Servidor, Login, Senha) totalmente funcional através da interface web.
 
 ### Objetivo
 Registrar melhorias futuras da camada web, sem alterar o escopo atual do robo.
