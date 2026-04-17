@@ -206,6 +206,14 @@ const FIMATHE_RULES = [
   },
 ];
 
+const TRADING_PROFILES: Record<string, { name: string, trend: string, entry: string, color: string }> = {
+  manual: { name: 'Personalizado (Manual)', trend: '', entry: '', color: 'text-gray-400' },
+  scalper: { name: 'Scalper (M15/M1)', trend: 'M15', entry: 'M1', color: 'text-primary' },
+  day_trader: { name: 'Day Trader (H1/M15)', trend: 'H1', entry: 'M15', color: 'text-green-400' },
+  position_trader: { name: 'Position Trader (H4/H1)', trend: 'H4', entry: 'H1', color: 'text-yellow-400' },
+  swing_trader: { name: 'Swing Trader (D1/H4)', trend: 'D1', entry: 'H4', color: 'text-purple-400' },
+};
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -287,6 +295,23 @@ export default function SettingsPage() {
         [key]: value
       }
     }));
+  };
+
+  const applyTradingProfile = (profileKey: string) => {
+    const profile = TRADING_PROFILES[profileKey];
+    if (!profile) return;
+
+    setSettings((prev: any) => {
+      const newSignalLogic = { ...prev.signal_logic, trading_type: profileKey };
+      if (profileKey !== 'manual') {
+        newSignalLogic.trend_timeframe = profile.trend;
+        newSignalLogic.entry_timeframe = profile.entry;
+      }
+      return {
+        ...prev,
+        signal_logic: newSignalLogic
+      };
+    });
   };
 
   if (loading) return (
@@ -491,7 +516,30 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-[32px] space-y-4">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Target className="w-3 h-3 text-primary" /> Perfil de Operação (Fimathe)
+                  </label>
+                  <select 
+                    value={settings.signal_logic?.trading_type || 'manual'}
+                    onChange={(e) => applyTradingProfile(e.target.value)}
+                    className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-primary appearance-none ${
+                        TRADING_PROFILES[settings.signal_logic?.trading_type || 'manual']?.color
+                    }`}
+                  >
+                    {Object.entries(TRADING_PROFILES).map(([key, p]) => (
+                      <option key={key} value={key} className="bg-slate-900 text-white">{p.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-500 italic px-2">
+                    {settings.signal_logic?.trading_type === 'manual' 
+                      ? '* Modo manual ativo: você tem liberdade total para definir os tempos.' 
+                      : `* Perfil ${TRADING_PROFILES[settings.signal_logic?.trading_type]?.name} selecionado: tempos gráficos otimizados automaticamente.`}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Timeframe Tendência</label>
                    <select 
@@ -499,7 +547,7 @@ export default function SettingsPage() {
                       onChange={(e) => updateNested('signal_logic', 'trend_timeframe', e.target.value)}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
                    >
-                      {['H4','H1','M30','M15'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                      {['W1', 'D1', 'H4','H1','M30','M15'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
                    </select>
                 </div>
                 <div className="space-y-2">

@@ -26,6 +26,7 @@ class SignalDetector:
             "H1": mt5.TIMEFRAME_H1,
             "H4": mt5.TIMEFRAME_H4,
             "D1": mt5.TIMEFRAME_D1,
+            "W1": mt5.TIMEFRAME_W1,
         }
         return mapping.get(str(tf_string).upper(), mt5.TIMEFRAME_M15)
 

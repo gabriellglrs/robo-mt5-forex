@@ -62,6 +62,7 @@ export interface FimatheAsset {
   open_positions: number;
   max_open_positions: number;
   current_pnl?: number;
+  trading_type?: string;
 }
 
 export interface RuntimeSnapshot {

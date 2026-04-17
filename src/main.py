@@ -220,7 +220,7 @@ def append_runtime_event(runtime_snapshot, symbol, message, level="INFO"):
         del events[:-80]
 
 
-def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, max_pos, point, breakout_buffer_points, trailing_summary, current_pnl=0.0):
+def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, max_pos, point, breakout_buffer_points, trailing_summary, trading_type="manual", current_pnl=0.0):
     reason = details.get("reason")
     signal = details.get("signal")
     trend_direction = details.get("trend_direction")
@@ -230,7 +230,6 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
     channel_low = _safe_float(details.get("channel_low"))
     breakout_distance_points = None
 
-    # Mapeamento de Fases (UI)
     status_phase = "monitoramento"
     if signal:
         status_phase = "entrada"
@@ -292,6 +291,8 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "symbol": symbol,
         "price": _safe_round(current_price, 5),
+        "trading_type": trading_type,
+        "current_pnl": _safe_round(current_pnl, 2),
         "status_phase": status_phase,
         "status_text": status_text,
         "signal": signal,
@@ -786,6 +787,7 @@ def main():
                         point=float(signal_point),
                         breakout_buffer_points=breakout_buffer_points,
                         trailing_summary=trailing_summary,
+                        trading_type=signal_cfg.get("trading_type", "manual"),
                         current_pnl=pnl_by_symbol.get(symbol, 0.0),
                     )
                     previous_reason = runtime_snapshot["symbols"].get(symbol, {}).get("reason")

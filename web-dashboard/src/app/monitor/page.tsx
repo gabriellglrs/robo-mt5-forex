@@ -39,6 +39,13 @@ const RULE_METADATA: Record<string, { name: string; desc: string }> = {
   'FIM-016': { name: 'Tendência Estrutural', desc: 'Topos/Fundos técnicos' },
 };
 
+const PROFILE_BADGES: Record<string, { label: string, color: string, bg: string }> = {
+  scalper: { label: 'SCALPER', color: 'text-primary', bg: 'bg-primary/10' },
+  day_trader: { label: 'DAY TRADER', color: 'text-green-400', bg: 'bg-green-400/10' },
+  position_trader: { label: 'POSITION', color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
+  swing_trader: { label: 'SWING', color: 'text-purple-400', bg: 'bg-purple-400/10' },
+};
+
 function RuleTraceMatrix({ trace }: { trace?: Record<string, string> }) {
   const rules = Array.from({ length: 16 }, (_, i) => {
     const id = `FIM-${(i + 1).toString().padStart(3, '0')}`;
@@ -239,7 +246,14 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
             {asset.symbol.substring(0, 3)}
           </div>
           <div>
-            <h3 className="font-bold text-white text-lg">{asset.symbol}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-white text-lg">{asset.symbol}</h3>
+              {asset.trading_type && PROFILE_BADGES[asset.trading_type] && (
+                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md border border-white/5 shadow-sm ${PROFILE_BADGES[asset.trading_type].bg} ${PROFILE_BADGES[asset.trading_type].color}`}>
+                  {PROFILE_BADGES[asset.trading_type].label}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <div className={`w-1.5 h-1.5 rounded-full ${styles.text.replace('text-', 'bg-')}`} />
               <span className={`text-[10px] font-bold uppercase tracking-widest ${styles.text}`}>

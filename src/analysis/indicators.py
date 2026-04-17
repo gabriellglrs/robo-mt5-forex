@@ -16,9 +16,12 @@ class IndicatorManager:
             "M5": mt5.TIMEFRAME_M5,
             "M15": mt5.TIMEFRAME_M15,
             "M30": mt5.TIMEFRAME_M30,
-            "H1": mt5.TIMEFRAME_H1
+            "H1": mt5.TIMEFRAME_H1,
+            "H4": mt5.TIMEFRAME_H4,
+            "D1": mt5.TIMEFRAME_D1,
+            "W1": mt5.TIMEFRAME_W1
         }
-        return mapping.get(tf_string, mt5.TIMEFRAME_M5)
+        return mapping.get(tf_string, mt5.TIMEFRAME_H1)
 
     def calculate_bollinger_bands(self, df, period=20, deviation=2.0):
         """Calcula BB no Open."""
