@@ -22,9 +22,11 @@ import {
   CheckCircle2,
   LogOut,
   ShieldCheck,
-  Trash2
+  Trash2,
+  HelpCircle as InfoIcon
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { RuleTooltip } from '@/components/RuleTooltip';
 
 const POPULAR_SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "EURGBP", "EURJPY", "BTCUSD", "ETHUSD", "XAUUSD"];
 
@@ -34,137 +36,169 @@ const FIMATHE_RULES = [
     name: 'Coleta de Dados', 
     type: 'MANDATORY', 
     desc: 'Verifica conectividade e histórico de candles.', 
-    tech: 'Detecta desconexão com o MT5 e valida se há dados suficientes para calcular canais.',
-    category: 'analysis' 
+    category: 'analysis',
+    purpose: 'Garante que o robô tenha insumos técnicos confiáveis para operar.',
+    onActive: 'Bloqueia operações preventivamente se a conexão com o MT5 falhar ou se houver "buracos" no histórico de preços.',
+    onInactive: 'Regra obrigatória. Não pode ser desativada para evitar execuções baseadas em dados corrompidos.'
   },
   { 
     id: 'FIM-002', 
     name: 'Tendência Principal', 
     type: 'MANDATORY', 
     desc: 'Define tendência ou bloqueia se lateral.', 
-    tech: 'Calcula o slope (inclinação) da média móvel. Se inferior ao limite, bloqueia por lateralidade.',
-    category: 'analysis' 
+    category: 'analysis',
+    purpose: 'Filtra mercados em consolidacao (caixote) que destroem o capital.',
+    onActive: 'Só permite compras em tendência de alta e vendas em baixa, seguindo o fluxo institucional.',
+    onInactive: 'Regra obrigatória. Sem ela, o robô operaria em lateralidade, onde a maioria dos stops são atingidos.'
   },
   { 
     id: 'FIM-003', 
     name: 'Canais A/B', 
     type: 'MANDATORY', 
     desc: 'Marcação automática de Canais.', 
-    tech: 'Identifica topos e fundos para projetar o Canal de Referência e Zona Neutra (100% amplitude).',
-    category: 'analysis' 
+    category: 'analysis',
+    purpose: 'Define a "região de valor" do preço baseada na volatilidade recente.',
+    onActive: 'Calcula matematicamente o Canal de Referência e Zona Neutra para projetar alvos realistas.',
+    onInactive: 'Regra obrigatória. Essencial para a existência da técnica Fimathe no código.'
   },
   { 
     id: 'FIM-004', 
-    name: 'Conformidade de Timeframe', 
+    name: 'Sincronia Temporal', 
     type: 'MANDATORY', 
     desc: 'Sincronia entre H1/M15/M1.', 
-    tech: 'Valida se o robô está recebendo candles dos tempos gráficos corretos para evitar sinais defasados.',
-    category: 'analysis' 
+    category: 'analysis',
+    purpose: 'Garante que a análise macro e micro estejam alinhadas no mesmo segundo.',
+    onActive: 'Valida se os candles de diferentes timeframes foram recebidos corretamente.',
+    onInactive: 'Regra obrigatória. Evita sinais baseados em preços antigos ou defasados.'
   },
   { 
     id: 'FIM-005', 
     name: 'Região Negociável', 
     type: 'MANDATORY', 
     desc: 'Preço em zona de Gatilho.', 
-    tech: 'Verifica se o preço está dentro do Canal A/B ou nas Projeções (50/100) onde a Fimathe autoriza negociação.',
-    category: 'analysis' 
+    category: 'analysis',
+    purpose: 'Garante que a entrada ocorra apenas em pontos de alta probabilidade estatística.',
+    onActive: 'Filtra o preço para que as ordens só ocorram dentro dos limites técnicos autorizados.',
+    onInactive: 'Regra obrigatória. Impede entradas "no meio do nada" que ignoram a estrutura de canais.'
   },
   { 
     id: 'FIM-006', 
     name: 'Filtro de Agrupamento', 
     type: 'OPTIONAL', 
     desc: 'Exige consolidação no M1.', 
-    tech: 'Analisa se os últimos candles no M1 ficaram em uma faixa estreita antes do rompimento.',
     key: 'require_grouping', 
-    category: 'signal_logic' 
+    category: 'signal_logic',
+    purpose: 'Proteção contra rompimentos falsos de um único candle (spike).',
+    onActive: 'Exige que o preço "respire" e consolide força antes de romper o canal.',
+    onInactive: 'Entradas mais rápidas, porém 30% mais expostas a "violinos" e reversões imediatas.'
   },
   { 
     id: 'FIM-007', 
     name: 'Rompimento Canal', 
     type: 'OPTIONAL', 
     desc: 'Exige fechamento fora do canal.', 
-    tech: 'Valida se o candle de sinal fechou fora do canal com corpo real, evitando pavios enganosos.',
     key: 'require_channel_break', 
-    category: 'signal_logic' 
+    category: 'signal_logic',
+    purpose: 'Validação de força compradora ou vendedora real.',
+    onActive: 'Exige que o candle feche com o corpo fora da borda, ignorando pavios enganosos.',
+    onInactive: 'Entradas antecipadas; ganha alguns pontos, mas aumenta o risco de rompimento falso.'
   },
   { 
     id: 'FIM-008', 
     name: 'Regra Anti-Achômetro', 
     type: 'OPTIONAL', 
     desc: 'Proximidade com S/S histórico.', 
-    tech: 'Verifica S/R históricos. Se longe de níveis fortes, a entrada é considerada de baixo valor.',
     key: 'require_sr_touch', 
-    category: 'signal_logic' 
+    category: 'signal_logic',
+    purpose: 'Confluência com níveis de Suporte e Resistência históricos do ativo.',
+    onActive: 'Só entra se o sinal for validado por barreiras de preço onde grandes players atuam.',
+    onInactive: 'O robô operará puramente pelo preço atual, ignorando a memória histórica do mercado.'
   },
   { 
     id: 'FIM-009', 
     name: 'Filtro de Spread', 
     type: 'OPTIONAL', 
     desc: 'Bloqueia custo alto.', 
-    tech: 'Compara o spread atual com o limite. Protege contra picos de volatilidade e spreads abusivos.',
     key: 'max_spread_points', 
     category: 'signal_logic', 
-    isThreshold: true 
+    isThreshold: true,
+    purpose: 'Controle de custos operacionais da corretora.',
+    onActive: 'Rejeita sinais se a taxa (spread) estiver muito alta, preservando sua margem líquida.',
+    onInactive: 'Você pode ganhar o trade tecnicamente, mas perder dinheiro devido ao custo da corretora.'
   },
   { 
     id: 'FIM-010', 
     name: 'Ciclo de Proteção', 
     type: 'OPTIONAL', 
     desc: 'Trailing stop automático.', 
-    tech: 'Gerencia o Break-even e Profit Lock automático conforme os sub-níveis Fimathe são atingidos.',
     key: 'fimathe_cycle_enabled', 
-    category: 'risk_management' 
+    category: 'risk_management',
+    purpose: 'Gestão dinâmica de stop-loss por níveis de expansão (50/100).',
+    onActive: 'Move para Zero a Zero e Trava Lucro automaticamente conforme o preço avança.',
+    onInactive: 'Gestão passiva; o robô não protegerá o lucro sozinho, exigindo intervenção manual no MT5.'
   },
   { 
     id: 'FIM-011', 
     name: 'Reteste (Pullback)', 
     type: 'OPTIONAL', 
-    desc: 'Exige retorno à borda do canal.', 
-    tech: 'Aguarda o preço tocar de volta na borda do canal rompido antes de disparar a ordem.',
+    desc: 'Exige retorno à borda.', 
     key: 'require_pullback_retest', 
-    category: 'signal_logic' 
+    category: 'signal_logic',
+    purpose: 'Entrada conservadora após a confirmação do rompimento.',
+    onActive: 'Aguarda o preço "voltar" e tocar na borda antes de disparar a ordem oficial.',
+    onInactive: 'Entrada agressiva no rompimento direto; prioriza execução sobre precisão de preço.'
   },
   { 
     id: 'FIM-012', 
     name: 'Limite de Risco (3%)', 
     type: 'MANDATORY', 
     desc: 'Trava de segurança financeira.', 
-    tech: 'Garante que o lote calculado nunca exceda 3% do capital da conta (Regra de Ouro da Página 10).',
-    category: 'risk_management' 
+    category: 'risk_management',
+    purpose: 'Preservação de capital baseada na "Regra de Ouro" da Fimathe.',
+    onActive: 'Garante que nenhuma operação arrisque mais que 3% do seu saldo total da conta.',
+    onInactive: 'Segurança nativa inegociável para garantir a sobrevivência da conta a longo prazo.'
   },
   { 
     id: 'FIM-013', 
     name: 'Gestão de Alvos', 
     type: 'MANDATORY', 
     desc: 'Cálculo dinâmico de TP.', 
-    tech: 'Aplica alvos matemáticos de 80%, 85% ou 100% da expansão conforme parametrizado na gestão de risco.',
-    category: 'risk_management' 
+    category: 'risk_management',
+    purpose: 'Ajuste matemático da saída (Take Profit) pela volatilidade do canal.',
+    onActive: 'Projeta alvos técnicos de 80%, 85% ou 100% conforme sua configuração de risco.',
+    onInactive: 'Regra central para garantir relações de Risco:Retorno matematicamente positivas.'
   },
   { 
     id: 'FIM-014', 
     name: 'Auditoria de Estado', 
     type: 'MANDATORY', 
-    desc: 'Rastreabilidade total de sinais.', 
-    tech: 'Gera um log determinístico (Rule Trace) para cada sinal, eliminando qualquer entrada baseada em achismo.',
-    category: 'analysis' 
+    desc: 'Rastreabilidade total.', 
+    category: 'analysis',
+    purpose: 'Elimina o "achismo" operacional através de logs detalhados.',
+    onActive: 'Cada entrada ou bloqueio gera um Rule Trace, explicando exatamente POR QUE o robô agiu.',
+    onInactive: 'Regra obrigatória para manutenção da transparência e auditoria de sinais.'
   },
   { 
     id: 'FIM-015', 
     name: 'Reversão Rigorosa', 
     type: 'OPTIONAL', 
     desc: 'Exige 2 níveis + Triângulo M1.', 
-    tech: 'Bloqueia sinais contra a tendência (ex: venda em alta) a menos que o preço tenha caído 2 níveis inteiros e consolidado (Triângulo) por 10 velas no M1.',
     key: 'strict_reversal_logic', 
-    category: 'signal_logic' 
+    category: 'signal_logic',
+    purpose: 'Evita a perigosa tentativa de "adivinhar" topos e fundos contra a tendência.',
+    onActive: 'Exige queda brusca e consolidação antes de permitir venda em tendência de alta.',
+    onInactive: 'Permite operações contra a tendência principal, elevando o risco de stop por continuidade.'
   },
   { 
     id: 'FIM-016', 
     name: 'Tendência Estrutural', 
     type: 'OPTIONAL', 
     desc: 'Valida Topos e Fundos (H1).', 
-    tech: 'Confirma se a inclinação da média é sustentada por fundos mais altos (em compra) ou topos mais baixos (em venda).',
     key: 'require_structural_trend', 
-    category: 'signal_logic' 
+    category: 'signal_logic',
+    purpose: 'Confirmação de força macro através da anatomia do preço.',
+    onActive: 'Só opera se a inclinação da média for sustentada por topos e fundos reais.',
+    onInactive: 'Baseia-se apenas na média móvel simples, ignorando a estrutura de braços do mercado.'
   },
 ];
 
@@ -175,6 +209,7 @@ export default function SettingsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('strategy'); // 'strategy', 'risk', 'connection'
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const [hoveredRuleId, setHoveredRuleId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -507,8 +542,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
-                  <Info className="w-3 h-3 text-gray-500" />
-                  <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest">Passe o mouse para detalhes técnicos</span>
+                  <InfoIcon className="w-3 h-3 text-secondary animate-pulse" />
+                  <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Passe o mouse no ícone para detalhes</span>
                 </div>
               </div>
 
@@ -516,7 +551,7 @@ export default function SettingsPage() {
                 {FIMATHE_RULES.map((rule) => (
                   <div 
                     key={rule.id} 
-                    className={`glass p-5 rounded-[32px] border transition-all duration-300 relative group overflow-hidden ${
+                    className={`glass p-5 rounded-[32px] border transition-all duration-300 relative group ${
                       rule.type === 'MANDATORY' ? 'border-primary/10 bg-primary/[0.01]' : 'border-white/5 hover:border-accent/30'
                     }`}
                   >
@@ -559,21 +594,28 @@ export default function SettingsPage() {
                     <h4 className="text-xs font-bold text-white mb-1 group-hover:text-accent transition-colors">{rule.name}</h4>
                     <p className="text-[9px] text-gray-500 leading-relaxed mb-1 pr-6">{rule.desc}</p>
                     
-                    <div className="absolute inset-0 bg-black/90 p-5 pt-14 flex flex-col justify-start translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out z-20 backdrop-blur-xl">
-                       <div className="flex items-center gap-2 mb-2 border-t border-white/5 pt-3">
-                          <Info className="w-3 h-3 text-accent" />
-                          <span className="text-[8px] font-black text-accent uppercase tracking-widest">Detalhe Técnico</span>
-                       </div>
-                       <p className="text-[9px] text-gray-400 leading-relaxed selection:bg-accent/30">
-                          {rule.tech}
-                       </p>
-                    </div>
-
                     {rule.type === 'MANDATORY' && (
                       <div className="absolute top-4 right-4 p-2">
                          <HelpCircle className="w-3 h-3 text-primary/30" />
                       </div>
                     )}
+
+                    {/* New Premium Tooltip attached to the (i) icon */}
+                    <div className="absolute top-10 right-4">
+                      <div 
+                        onMouseEnter={() => setHoveredRuleId(rule.id)}
+                        onMouseLeave={() => setHoveredRuleId(null)}
+                        className="p-2 cursor-help text-gray-600 hover:text-secondary hover:bg-white/5 rounded-full transition-all"
+                      >
+                        <InfoIcon className="w-3.5 h-3.5" />
+                      </div>
+                      
+                      <RuleTooltip 
+                        rule={rule as any} 
+                        isActive={(rule.isThreshold ? (settings[rule.category!]?.[rule.key!] > 0) : settings[rule.category!]?.[rule.key!]) || rule.type === 'MANDATORY'}
+                        isVisible={hoveredRuleId === rule.id}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>

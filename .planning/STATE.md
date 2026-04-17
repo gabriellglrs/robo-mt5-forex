@@ -29,11 +29,12 @@ Projeto com Phase 8 finalizada. O motor de decis√£o Fimathe foi desacoplado para
 - [x] Phase 12: Monitor de Execu√ß√£o Advanced UI/UX
 - [x] Phase 13: Transpar√™ncia Financeira (Profit Monitoring)
 - [x] Phase 14: Hardening Estrat√©gico
-- [/] Phase 15: Excel√™ncia UX - Tooltips Inteligentes Fimathe
+- [x] Phase 15: ExcelÍncia UX - Tooltips Inteligentes Fimathe
 
 ## Estado Atual
-**Fase 15 (Planning)** ‚Äî Projetando melhoria de UX nos tooltips das regras Fimathe.
-O rob√¥ est√° operacional com 100% de ader√™ncia estrat√©gica; agora refinamos a clareza para o usu√°rio.
+**Fase 15 Shipped** ó ImplementaÁ„o dos tooltips premium (balıes) sobre o Ìcone (i).
+A interface agora oferece clareza total sobre o propÛsito e impacto de cada regra da estratÈgia.
+Proximo passo: Monitorar feedback do usu·rio e performance em conta real.
 
 ## Entregas fechadas na Phase 7
 - SPEC e Gap Analysis consolidados.
@@ -74,5 +75,7 @@ Monitorar performance em conta demo/real e realizar ajustes finos conforme o com
 
 ### Roadmap Evolution
 - **2026-04-16**: Phase 11 added (Homologa√ß√£o e Testes de Funcionalidade Fimathe) baseada no manual de estrat√©gia original.
+
 - **2026-04-17**: Backlog futuro da Web Next.js registrado no ROADMAP (seguranca de sessao, contrato API/UI, validacoes, testes, a11y e observabilidade).
 - **2026-04-17**: Backlog futuro de implementacoes funcionais Web + MT5 registrado no ROADMAP (conexao operacional, validacoes de corretora, reconciliacao, risco operacional, alertas e relatorios).
+
