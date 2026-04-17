@@ -121,3 +121,57 @@ class OrderEngine:
             )
 
         return result
+
+    def get_position_closure_details(self, ticket):
+        """Busca no historico do MT5 os detalhes do fechamento de um ticket (PnL real)."""
+        import time
+        from datetime import datetime, timedelta
+
+        # Busca historico desde 24h atras ate agora
+        from_date = datetime.now() - timedelta(days=1)
+        to_date = datetime.now() + timedelta(minutes=5)
+        
+        # Filtra pelo ticket da POSICAO (que e o mesmo do ticket original da ordem no MT5)
+        deals = mt5.history_deals_get(from_date, to_date, position=int(ticket))
+        
+        if deals is None or len(deals) == 0:
+            self.logger.warning(f"Nenhum deal de fechamento encontrado para o ticket #{ticket} no historico.")
+            return None
+
+        # O deal de fechamento e aquele que tem entry == mt5.DEAL_ENTRY_OUT
+        exit_deal = None
+        for d in deals:
+            if d.entry == mt5.DEAL_ENTRY_OUT:
+                exit_deal = d
+                break
+        
+        # Se nao achou o OUT, pega o ultimo deal por seguranca (pode ser fechamento total/parcial)
+        if not exit_deal:
+            exit_deal = deals[-1]
+
+        return {
+            "ticket": ticket,
+            "exit_price": exit_deal.price,
+            "exit_time": datetime.fromtimestamp(exit_deal.time),
+            "pnl": exit_deal.profit + exit_deal.swap + exit_deal.commission,
+            "comment": exit_deal.comment,
+            "reason": exit_deal.reason # sl, tp, client, etc
+        }
+
+    def sync_position_closure(self, ticket):
+        """Audita e sincroniza o fechamento de uma posicao com o banco de dados."""
+        if not self.db:
+            return None
+        
+        details = self.get_position_closure_details(ticket)
+        if not details:
+            # Caso nao encontre no historico imediato, logamos mas nao fechamos no banco ainda
+            return None
+        
+        self.db.close_trade(
+            ticket=ticket,
+            exit_price=details["exit_price"],
+            pnl=details["pnl"],
+            exit_time=details["exit_time"]
+        )
+        return details

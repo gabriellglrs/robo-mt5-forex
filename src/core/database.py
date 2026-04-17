@@ -172,3 +172,29 @@ class DatabaseManager:
                 cursor.close()
             if conn is not None:
                 conn.close()
+
+    def close_trade(self, ticket, exit_price, pnl, exit_time=None):
+        """Marca um trade como fechado e registra o lucro/prejuizo final."""
+        sql = """
+        UPDATE trades
+        SET exit_price = %s, exit_time = %s, pnl = %s, status = 'CLOSED'
+        WHERE ticket = %s
+        """
+        data = (
+            exit_price,
+            exit_time or datetime.now(),
+            pnl,
+            ticket
+        )
+
+        conn = self.pool.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(sql, data)
+            conn.commit()
+            self.logger.info(f"Trade #{ticket} encerrado no banco (PnL: {pnl:.2f}).")
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar fechamento de trade: {exc}")
+        finally:
+            cursor.close()
+            conn.close()

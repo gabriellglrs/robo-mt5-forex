@@ -592,6 +592,7 @@ def main():
         last_analysis_log_per_symbol = {symbol: 0.0 for symbol in engines.keys()}
         last_order_ts_per_symbol = {symbol: 0.0 for symbol in engines.keys()}
         last_trailing_update_per_ticket = {}
+        active_tickets_per_symbol = {symbol: set() for symbol in engines.keys()}
         trade_context_cache = {}
         cycle_state_by_ticket = {}
         last_runtime_write_ts = 0.0
@@ -694,7 +695,27 @@ def main():
                     signal = details.get("signal")
 
                     order_engine = engine["order_engine"]
-                    open_count = order_engine.count_open_positions(symbol)
+                    current_positions = order_engine.get_open_positions(symbol)
+                    open_count = len(current_positions)
+                    current_tickets = {pos.ticket for pos in current_positions}
+                    
+                    # Auditoria de Fechamento (Se um ticket sumiu, ele foi fechado)
+                    last_tickets = active_tickets_per_symbol.get(symbol, set())
+                    closed_tickets = last_tickets - current_tickets
+                    for closed_ticket in closed_tickets:
+                        logger.info(f"[{symbol}] Detecao de fechamento para o ticket #{closed_ticket}. Sincronizando historico...")
+                        close_details = order_engine.sync_position_closure(closed_ticket)
+                        if close_details:
+                            pnl_val = close_details.get("pnl", 0.0)
+                            pnl_str = f"+${pnl_val:.2f}" if pnl_val >= 0 else f"-${abs(pnl_val):.2f}"
+                            append_runtime_event(
+                                runtime_snapshot,
+                                symbol,
+                                f"Trade #{closed_ticket} encerrado. Resultado final: {pnl_str}",
+                                "TRADE_CLOSE"
+                            )
+                    active_tickets_per_symbol[symbol] = current_tickets
+
                     max_pos = risk_cfg.get("max_open_positions", 1)
                     if open_count > 0:
                         details["rule_id"] = details.get("rule_id") or "FIM-010"
