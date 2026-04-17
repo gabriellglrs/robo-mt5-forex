@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Info, ShieldCheck, ShieldAlert, Zap } from 'lucide-react';
+import { Info, ShieldCheck, ShieldAlert, Zap, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 interface RuleTooltipProps {
   rule: {
@@ -73,6 +74,17 @@ export const RuleTooltip: React.FC<RuleTooltipProps> = ({ rule, isActive, isVisi
                 <p className={`text-[10px] leading-relaxed ${isActive ? 'text-gray-300' : 'text-orange-200/70 font-medium'}`}>
                   {isActive ? rule.onActive : rule.onInactive}
                 </p>
+              </div>
+
+              {/* Link to Academy */}
+              <div className="pt-2 border-t border-white/5 flex justify-end">
+                <Link 
+                  href={`/academy?rule=${rule.id}`}
+                  className="flex items-center gap-1.5 text-[9px] font-black text-secondary hover:text-white transition-colors group/link"
+                >
+                  Saber mais na Academy 
+                  <ArrowRight className="w-2.5 h-2.5 group-hover/link:translate-x-0.5 transition-transform" />
+                </Link>
               </div>
             </div>
 

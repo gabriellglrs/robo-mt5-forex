@@ -8,7 +8,8 @@ import {
   Terminal, 
   TrendingUp, 
   ShieldCheck,
-  Zap
+  Zap,
+  GraduationCap
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -18,6 +19,7 @@ const menuItems = [
   { icon: Activity, label: 'Monitor Fimathe', href: '/monitor' },
   { icon: Terminal, label: 'Logs & Auditoria', href: '/logs' },
   { icon: Settings, label: 'Configurações', href: '/settings' },
+  { icon: GraduationCap, label: 'Fimathe Academy', href: '/academy' },
 ];
 
 export function Sidebar() {

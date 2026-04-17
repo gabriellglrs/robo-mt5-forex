@@ -28,7 +28,11 @@ import {
 import { useRouter } from 'next/navigation';
 import { RuleTooltip } from '@/components/RuleTooltip';
 
-const POPULAR_SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "EURGBP", "EURJPY", "BTCUSD", "ETHUSD", "XAUUSD"];
+const POPULAR_SYMBOLS = [
+  "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", // Majors
+  "EURGBP", "EURJPY", "EURCHF", "EURAUD", "GBPJPY", "GBPAUD", "AUDJPY", // Minors
+  "XAUUSD", "XAGUSD", "BTCUSD", "ETHUSD", "US30", "SPX500", "NAS100", "GER40" // Metals, Crypto, Indices
+];
 
 const FIMATHE_RULES = [
   { 
@@ -416,6 +420,24 @@ export default function SettingsPage() {
                       ))}
                       
                       <div className="flex items-center gap-2 ml-auto">
+                        <input 
+                          type="text"
+                          placeholder="DIGITE O ATIVO..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const target = e.target as HTMLInputElement;
+                              const val = target.value.trim().toUpperCase();
+                              if (val && !settings.analysis?.symbols?.includes(val)) {
+                                const newList = [...(settings.analysis?.symbols || []), val];
+                                updateNested('analysis', 'symbols', newList);
+                                target.value = "";
+                              }
+                            }
+                          }}
+                          className="bg-transparent text-[10px] font-bold text-gray-400 placeholder:text-gray-600 focus:text-white focus:outline-none border-b border-transparent focus:border-primary/30 w-28 transition-all"
+                        />
+                        <div className="w-px h-4 bg-white/10 mx-1" />
                         <select 
                           onChange={(e) => {
                             if (e.target.value && !settings.analysis?.symbols?.includes(e.target.value)) {
@@ -426,7 +448,7 @@ export default function SettingsPage() {
                           }}
                           className="bg-transparent text-[10px] font-bold text-gray-500 focus:outline-none cursor-pointer hover:text-white transition-colors"
                         >
-                          <option value="">+ ADICIONAR POPULAR</option>
+                          <option value="">+ POPULARES</option>
                           {POPULAR_SYMBOLS.filter(s => !settings.analysis?.symbols?.includes(s)).map(s => (
                             <option key={s} value={s} className="bg-black">{s}</option>
                           ))}

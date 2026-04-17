@@ -7,14 +7,15 @@
             "AUDUSD",
             "USDJPY",
             "EURGBP",
-            "EURJPY"
+            "EURJPY",
+            "HK50"
         ],
         "history_years": 2,
         "wick_sensitivity": 0.3,
         "trend_candles": 200
     },
     "signal_logic": {
-        "trend_timeframe": "H1",
+        "trend_timeframe": "M15",
         "entry_timeframe": "M1",
         "breakout_buffer_points": 10,
         "trend_min_slope_points": 0.2,

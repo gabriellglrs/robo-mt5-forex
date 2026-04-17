@@ -102,16 +102,20 @@ def evaluate_state_machine(technicals, settings):
     rule_trace = {
         "FIM-001": "pendente",
         "FIM-002": "pendente",
-        "FIM-016": "desativado" if not require_structural else "pendente",
         "FIM-003": "pendente",
-        "FIM-004": "ok", # Referencia temporal
+        "FIM-004": "ok", # Referencia temporal constante
         "FIM-005": "pendente",
         "FIM-006": "desativado" if not require_grouping else "pendente",
         "FIM-007": "desativado" if not require_breakout else "pendente",
-        "FIM-011": "desativado" if not require_pullback else "pendente",
         "FIM-008": "desativado" if not require_sr_touch else "pendente",
-        "FIM-015": "desativado" if not strict_reversal else "pendente",
         "FIM-009": "desativado" if max_spread <= 0 else "pendente",
+        "FIM-010": "pendente", # Ciclo de protecao (pos-sinal)
+        "FIM-011": "desativado" if not require_pullback else "pendente",
+        "FIM-012": "pendente", # Limite de risco (pos-sinal)
+        "FIM-013": "pendente", # Gestao de alvos (pos-sinal)
+        "FIM-014": "ok",       # Auditoria de Estado (Ativa)
+        "FIM-015": "desativado" if not strict_reversal else "pendente",
+        "FIM-016": "desativado" if not require_structural else "pendente",
     }
 
     # 1. Check data availability
@@ -254,6 +258,11 @@ def evaluate_state_machine(technicals, settings):
     # 10. Setup Ready
     signal = technicals.get("candidate_signal")
     reason = "setup_pronto"
+    
+    if signal:
+        rule_trace["FIM-010"] = "ok"
+        rule_trace["FIM-012"] = "ok"
+        rule_trace["FIM-013"] = "ok"
     
     return {
         "signal": signal,

@@ -229,54 +229,43 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
     channel_low = _safe_float(details.get("channel_low"))
     breakout_distance_points = None
 
+    # Mapeamento de Fases (UI)
     status_phase = "monitoramento"
-    status_text = "Monitorando setup Fimathe."
-
     if signal:
         status_phase = "entrada"
-        status_text = f"Setup pronto para {signal}. Validar risco e executar entrada."
-    elif reason == "sem_dados_timeframe":
+    elif reason in ["sem_dados_timeframe"]:
         status_phase = "dados"
-        status_text = "Aguardando dados suficientes de candles."
-    elif reason == "mercado_lateral":
+    elif reason in ["mercado_lateral", "tendencia_sem_confluencia"]:
         status_phase = "tendencia"
-        status_text = "Mercado lateral no timeframe de tendencia."
-    elif reason == "sem_regiao_ab":
-        status_phase = "monitoramento"
-        status_text = "Sem consolidacao valida para marcar ponto-A e ponto-B."
-    elif reason == "aguardando_rompimento_canal":
-        status_phase = "rompimento"
-        status_text = "Aguardando rompimento do canal de entrada."
-        if point and channel_mid is not None:
-            breakout_line = channel_mid
-            if trend_direction == "BUY":
-                breakout_line = channel_mid + (breakout_buffer_points * point)
-                breakout_distance_points = (breakout_line - current_price) / point
-            elif trend_direction == "SELL":
-                breakout_line = channel_mid - (breakout_buffer_points * point)
-                breakout_distance_points = (current_price - breakout_line) / point
+    elif reason in ["aguardando_rompimento_canal", "aguardando_pullback"]:
+        status_phase = "rompimento" if reason == "aguardando_rompimento_canal" else "pullback"
+    elif reason in ["fora_da_regiao_negociavel", "longe_do_nivel_sr", "reversao_bloqueada"]:
+        status_phase = "sr"
+    
+    # Texto e Gatilho Vêm Prioritariamente do Motor de Estados (Consistência 100%)
+    status_text = details.get("rule_name") or "Monitorando setup Fimathe."
+    next_trigger = details.get("next_trigger") or "Aguardar proximo gatilho tecnico."
 
-            if breakout_distance_points is not None:
-                breakout_distance_points = round(float(breakout_distance_points), 2)
-                near_breakout_threshold = max(5.0, float(breakout_buffer_points) * 0.35)
-                if breakout_distance_points <= near_breakout_threshold:
-                    status_text = "Esta prestes a romper o canal. Preparar entrada."
-    elif reason == "aguardando_pullback":
-        status_phase = "pullback"
-        status_text = "Rompimento ocorreu, aguardando pullback/reteste."
-    elif reason == "aguardando_agrupamento":
-        status_phase = "monitoramento"
-        status_text = "Aguardando agrupamento/consolidacao no timeframe de entrada."
-    elif reason == "fora_da_regiao_negociavel":
-        status_phase = "sr"
-        status_text = "Preco fora da regiao negociavel da projecao Fimathe."
-    elif reason == "longe_do_nivel_sr":
-        status_phase = "sr"
-        status_text = "Setup alinhado, mas ainda longe da regiao S/R."
+    # Lógica de Proximidade (Sobrescreve texto se estiver "quase lá")
+    if reason == "aguardando_rompimento_canal" and point and channel_mid is not None:
+        breakout_line = channel_mid
+        if trend_direction == "BUY":
+            breakout_line = channel_mid + (breakout_buffer_points * point)
+            breakout_distance_points = (breakout_line - current_price) / point
+        elif trend_direction == "SELL":
+            breakout_line = channel_mid - (breakout_buffer_points * point)
+            breakout_distance_points = (current_price - breakout_line) / point
+
+        if breakout_distance_points is not None:
+            breakout_distance_points = round(float(breakout_distance_points), 2)
+            near_breakout_threshold = max(5.0, float(breakout_buffer_points) * 0.35)
+            if breakout_distance_points <= near_breakout_threshold:
+                status_text = "Esta prestes a romper o canal. Preparar entrada."
 
     if open_count >= max_pos:
         status_phase = "limite"
-        status_text = "Limite maximo de posicoes neste ativo foi atingido."
+        status_text = "Limite maximo de posicoes atingido."
+        next_trigger = "Aguardar vaga de exposicao para liberar nova entrada."
 
     trailing_updates = int(trailing_summary.get("updated", 0))
     last_cycle_action = trailing_summary.get("last_cycle_action", {})
@@ -295,7 +284,7 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
         next_trigger = trailing_summary.get("next_trigger") or "Aguardar evento tecnico de stop (topo/50/100)."
 
     if open_count >= max_pos:
-        rule_id = "FIM-013"
+        rule_id = "FIM-012" # Relacionado a Limite de Risco/Exposicao
         next_trigger = "Aguardar fechamento de posicao para liberar nova entrada."
 
     return {
@@ -712,7 +701,7 @@ def main():
                         if trailing_summary.get("next_trigger"):
                             details["next_trigger"] = trailing_summary.get("next_trigger")
                     if open_count >= max_pos:
-                        details["rule_id"] = "FIM-013"
+                        details["rule_id"] = "FIM-012"
                         details["rule_name"] = "Limites de exposicao"
                         details["next_trigger"] = "Aguardar vaga de exposicao para liberar nova entrada."
                     signal_point = getattr(engine["signal_detector"], "point", 0.00001) or 0.00001

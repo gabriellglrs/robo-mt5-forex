@@ -130,6 +130,22 @@ Plans:
 3. Design Glassmorphism + Neon alinhado ao tema Cockpit.
 4. Remoção da animação de hover antiga que obstruía os cards.
 
+### Phase 16: Central de Educação (Fimathe Academy)
+**Goal**: Criar uma enciclopédia interativa (/academy) com explicações profundas de cada regra FIM, guias de configuração e dicas operacionais.
+**Depends on**: Phase 15
+**Success Criteria**:
+1. Nova rota `/academy` com layout estilo Wiki/Doc especializado.
+2. Artigos detalhados para todas as 16 regras (Motivação, Lógica e Consequências).
+3. Seção de "Dicas Pro" para configuração de filtros opcionais.
+4. Deep-links dos tooltips das Settings para a Academy.
+
+### Phase 17: Log Determinístico 100% (Transparência Total)
+**Goal**: Garantir que o `rule_trace` nos logs contenha as 16 regras Fimathe em todas as análises, eliminando qualquer omissão técnica.
+**Depends on**: Phase 14
+**Success Criteria**:
+1. Todos os logs do `fimathe_state_engine` contém as chaves FIM-001 a FIM-016.
+2. Status semânticos corretos (ok, bloqueado, pendente, desativado).
+
 ---
 **Status Atual**: Fase 14 CONCLUÍDA. Conformidade Fimathe 100% Validada (FIM-001 até FIM-016).
 
