@@ -165,6 +165,7 @@ def build_analysis_flow_payload(symbol, current_price, details, open_count, max_
         "tf_results": tf_summary,
         "open_positions": int(open_count),
         "max_open_positions": int(max_pos),
+        "display_text": f"[{symbol}] {details.get('rule_name') or 'Aguardando'}: {details.get('next_trigger') or 'Monitorando setup.'}",
     }
 
 
@@ -630,6 +631,9 @@ def main():
         if analysis_flow_interval_seconds < 5:
             analysis_flow_interval_seconds = 5
         last_analysis_log_per_symbol = {symbol: 0.0 for symbol in engines.keys()}
+        last_logged_reason_per_symbol = {symbol: None for symbol in engines.keys()}
+        last_logged_signal_per_symbol = {symbol: None for symbol in engines.keys()}
+        last_audit_log_ts_per_symbol = {symbol: 0.0 for symbol in engines.keys()}
         last_order_ts_per_symbol = {symbol: 0.0 for symbol in engines.keys()}
         last_trailing_update_per_ticket = {}
         active_tickets_per_symbol = {symbol: set() for symbol in engines.keys()}
@@ -806,7 +810,18 @@ def main():
                         )
 
                     now_ts = time.time()
-                    if (now_ts - last_analysis_log_per_symbol.get(symbol, 0.0)) >= analysis_flow_interval_seconds:
+                    
+                    # LOGICA DELTA: So grava no banco de dados se o estado mudar ou a cada 10 min (heartbeat)
+                    current_reason = details.get("reason")
+                    current_signal = details.get("signal")
+                    last_reason = last_logged_reason_per_symbol.get(symbol)
+                    last_signal = last_logged_signal_per_symbol.get(symbol)
+                    
+                    # Mudanca de fase ou mudanca de sinal (ex: de None para BUY, ou de BUY para None)
+                    is_state_change = (current_reason != last_reason) or (current_signal != last_signal)
+                    is_heartbeat = (now_ts - last_audit_log_ts_per_symbol.get(symbol, 0.0)) >= 600 # 10 minutos
+                    
+                    if is_state_change or is_heartbeat:
                         payload = build_analysis_flow_payload(
                             symbol=symbol,
                             current_price=current_price,
@@ -814,8 +829,11 @@ def main():
                             open_count=open_count,
                             max_pos=max_pos,
                         )
-                        db_manager.log_event("INFO", "AnalysisFlow", json.dumps(payload, ensure_ascii=False))
-                        last_analysis_log_per_symbol[symbol] = now_ts
+                        log_msg = f"{payload.get('display_text', symbol)} | {json.dumps(payload, ensure_ascii=False)}"
+                        db_manager.log_event("INFO", "AnalysisFlow", log_msg)
+                        last_logged_reason_per_symbol[symbol] = current_reason
+                        last_logged_signal_per_symbol[symbol] = current_signal
+                        last_audit_log_ts_per_symbol[symbol] = now_ts
 
                     if not signal:
                         continue
