@@ -1,13 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: Aderência Total Fimathe
-status: active
-last_updated: "2026-04-17T13:28:00.000Z"
+milestone_name: milestone
+status: Phase 21 shipped — milestone-3
+last_updated: "2026-04-17T23:25:18.263Z"
 progress:
-  total_phases: 22
-  completed_phases: 21
-  percent: 96
+  total_phases: 14
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State: robo-mt5-v2
@@ -26,27 +28,32 @@ Projeto com Phase 20 finalizada. O motor de execução `fimathe_cycle.py` agora 
 - [ ] Phase 21: Conexão MT5 e Status em Real-time
 
 ## Estado Atual
+
 **Fase 20 Shipped** — O robô atingiu um novo nível de controle de risco. Implementamos as regraspuristas FIM-017 (BE Fixo) e FIM-018 (Infinity Trail). Além da lógica no motor Python, toda a interface web foi adaptada para permitir ajustes manuais de porcentagem, com o suporte didático da Academy integrada.
 A suíte de testes unitários v2 garante que as novas regras não conflitam com a gestão clássica da Fimathe.
 
 ## Entregas fechadas na Phase 7
+
 - SPEC e Gap Analysis consolidados.
 - Ciclo explicito de stop por eventos adicionado.
 - Rastreio por `rule_id` integrado ao runtime.
 
 ## Entregas fechadas na Phase 8
+
 - **Motor de Estados Dedicado**: `src/analysis/fimathe_state_engine.py` centralizando regras FIM-001..FIM-008.
 - **RefatoraÃ§Ã£o de Sinais**: `src/analysis/signals.py` simplificado e desacoplado.
 - **Suite de Testes**: 11 cenÃ¡rios de teste unitÃ¡rio em `tests/test_fimathe_state_engine.py`.
 - **ValidaÃ§Ã£o Funcional**: Smoke test `tests/verify_signals.py` aprovado com MT5 venv.
 
 ## Entregas fechadas na Phase 9
+
 - **CÃ¡lculo de Lote DeterminÃ­stico**: Trava de risco em 3% do Account Balance.
 - **Stop TÃ©cnico Fimathe (STI)**: Posicionamento automÃ¡tico com base na Zona Neutra.
 - **Trailing Stop Proativo**: Gatilhos automÃ¡ticos para Break-even (50%) e Trava de Lucro (100%).
 - **Suite de Testes de Risco**: ValidaÃ§Ã£o de gatilhos proativos em `tests/test_fimathe_cycle.py`.
 
 ## Entregas fechadas na Phase 13
+
 - **Snapshot Financeiro**: InjeÃ§Ã£o de `Balance`, `Equity` e `Profit` global no runtime snapshot.
 - **PnL por Ativo**: Rastreamento individual de lucro/prejuÃ­zo flutuante por sÃ­mbolo.
 - **Dashboard Financeiro & Fluxo de Logs**: Novo CabeÃ§alho global com widgets neon para capital e grid unificado de histÃ³rico.
@@ -56,24 +63,27 @@ A suíte de testes unitários v2 garante que as novas regras não conflitam com 
 - **Interatividade Total**: ExibiÃ§Ã£o explÃ­cita de `rule_id`, `next_trigger` em tempo real e tooltips ricos.
 
 ## Validacao comportamental
+
 - MÃ¡quina de estados desacoplada com transiÃ§Ãµes explÃ­citas.
 - GestÃ£o de risco proativa sem depender de cruzamento de volta (retrataÃ§Ã£o) para proteÃ§Ã£o inicial.
 - 100% de aproveitamento nos testes unitÃ¡rios de ciclo.
 
 ## Entregas fechadas na Phase 17 (Performance BI)
+
 - **Central de Inteligência**: Nova rota `/stats` com visual "Relatório Executivo".
 - **KPIs Profissionais**: Implementação de Fator de Lucro, Payoff Ratio e Win Rate no Backend.
 - **Análise de Risco**: Cálculo automático de Drawdown Máximo Realizado.
 - **Gráficos Dinâmicos**: Curva de Equity Realizada, Distribuição Win/Loss e Ranking de Performance por Ativo (BarChart).
 
 ## Proximo passo imediato
+
 Monitorar a precisão dos dados de performance conforme mais trades são fechados e validar se os cálculos de drawdown refletem fielmente a realidade da conta vinculada.
 
 ## Accumulated Context
 
 ### Roadmap Evolution
+
 - **2026-04-16**: Phase 11 added (HomologaÃ§Ã£o e Testes de Funcionalidade Fimathe) baseada no manual de estratÃ©gia original.
 
 - **2026-04-17**: Backlog futuro da Web Next.js registrado no ROADMAP (seguranca de sessao, contrato API/UI, validacoes, testes, a11y e observabilidade).
 - **2026-04-17**: Backlog futuro de implementacoes funcionais Web + MT5 registrado no ROADMAP (conexao operacional, validacoes de corretora, reconciliacao, risco operacional, alertas e relatorios).
-
