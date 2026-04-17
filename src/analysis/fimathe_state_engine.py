@@ -45,7 +45,7 @@ def resolve_rule_meta(reason, signal=None):
             "Reteste (Pullback)",
             "Aguardar pullback/reteste dentro da tolerancia.",
         ),
-        "long_do_nivel_sr": (
+        "longe_do_nivel_sr": (
             "FIM-008",
             "Regra anti-achometro",
             "Aguardar toque/regiao S-R para completar confluencia.",

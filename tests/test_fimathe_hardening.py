@@ -2,9 +2,9 @@ import pytest
 import pandas as pd
 import numpy as np
 from unittest.mock import MagicMock, patch
-from analysis.signals import SignalDetector
-from analysis.levels import LevelDetector
-from execution.risk import RiskManager
+from src.analysis.signals import SignalDetector
+from src.analysis.levels import LevelDetector
+from src.execution.risk import RiskManager
 
 @pytest.fixture
 def mock_symbol_info():

@@ -31,7 +31,7 @@ def test_state_machine_lateral():
     assert res["rule_trace"]["FIM-002"] == "bloqueado_lateral"
 
 def test_state_machine_no_ab():
-    techs = {"data_ok": True, "trend_direction": "BUY", "ab_ok": False}
+    techs = {"data_ok": True, "trend_direction": "BUY", "structural_ok": True, "ab_ok": False}
     res = evaluate_state_machine(techs, {})
     assert res["signal"] is None
     assert res["reason"] == "sem_regiao_ab"
@@ -41,6 +41,7 @@ def test_state_machine_out_of_region():
     techs = {
         "data_ok": True,
         "trend_direction": "BUY",
+        "structural_ok": True,
         "ab_ok": True,
         "near_trade_region": False
     }
@@ -54,6 +55,7 @@ def test_state_machine_no_grouping():
     techs = {
         "data_ok": True,
         "trend_direction": "BUY",
+        "structural_ok": True,
         "ab_ok": True,
         "near_trade_region": True,
         "grouping_ok": False
@@ -71,12 +73,13 @@ def test_state_machine_no_grouping():
     res = evaluate_state_machine(techs, {"require_grouping": False})
     assert res["reason"] == "setup_pronto"
     assert res["signal"] == "BUY"
-    assert res["rule_trace"]["FIM-006"] == "ok"
+    assert res["rule_trace"]["FIM-006"] == "desativado"
 
 def test_state_machine_no_breakout():
     techs = {
         "data_ok": True,
         "trend_direction": "BUY",
+        "structural_ok": True,
         "ab_ok": True,
         "near_trade_region": True,
         "grouping_ok": True,
@@ -91,6 +94,7 @@ def test_state_machine_no_pullback():
     techs = {
         "data_ok": True,
         "trend_direction": "BUY",
+        "structural_ok": True,
         "ab_ok": True,
         "near_trade_region": True,
         "grouping_ok": True,
@@ -99,12 +103,13 @@ def test_state_machine_no_pullback():
     }
     res = evaluate_state_machine(techs, {})
     assert res["reason"] == "aguardando_pullback"
-    assert res["rule_id"] == "FIM-007"
+    assert res["rule_id"] == "FIM-011"
 
 def test_state_machine_far_from_sr():
     techs = {
         "data_ok": True,
         "trend_direction": "BUY",
+        "structural_ok": True,
         "ab_ok": True,
         "near_trade_region": True,
         "grouping_ok": True,
@@ -128,6 +133,8 @@ def test_state_machine_full_buy():
     techs = {
         "data_ok": True,
         "trend_direction": "BUY",
+        "structural_ok": True,
+        "reversal_ok": True,
         "ab_ok": True,
         "near_trade_region": True,
         "grouping_ok": True,
@@ -140,13 +147,15 @@ def test_state_machine_full_buy():
     assert res["signal"] == "BUY"
     assert res["reason"] == "setup_pronto"
     assert res["rule_id"] == "FIM-008"
-    for rule in ["FIM-001", "FIM-002", "FIM-003", "FIM-004", "FIM-005", "FIM-006", "FIM-007", "FIM-008"]:
+    for rule in ["FIM-001", "FIM-002", "FIM-003", "FIM-004", "FIM-005", "FIM-006", "FIM-007", "FIM-008", "FIM-011", "FIM-015", "FIM-016"]:
         assert res["rule_trace"][rule] == "ok"
 
 def test_state_machine_full_sell():
     techs = {
         "data_ok": True,
         "trend_direction": "SELL",
+        "structural_ok": True,
+        "reversal_ok": True,
         "ab_ok": True,
         "near_trade_region": True,
         "grouping_ok": True,
