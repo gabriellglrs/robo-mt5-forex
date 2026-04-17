@@ -46,37 +46,66 @@ function RuleTraceMatrix({ trace }: { trace?: Record<string, string> }) {
     return { id, status };
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'ok': return 'bg-primary border-primary shadow-[0_0_8px_rgba(0,255,170,0.4)]';
-      case 'bloqueado': return 'bg-red-500 border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]';
-      case 'desativado': return 'bg-gray-700 border-gray-600 opacity-40';
-      default: return 'bg-amber-400/40 border-amber-400/20'; // pendente
+      case 'ok': return {
+        color: 'bg-primary border-primary shadow-[0_0_8px_rgba(0,255,170,0.4)]',
+        label: 'Validado',
+        msg: 'Critério técnico atendido.'
+      };
+      case 'bloqueado': return {
+        color: 'bg-red-500 border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]',
+        label: 'Bloqueado',
+        msg: 'Entrada impedida por esta regra.'
+      };
+      case 'desativado': return {
+        color: 'bg-gray-700 border-gray-600 opacity-40',
+        label: 'Desativado',
+        msg: 'Regra ignorada via configurações.'
+      };
+      default: return { // pendente
+        color: 'bg-amber-400/40 border-amber-400/20',
+        label: 'Pendente',
+        msg: 'Aguardando processamento de mercado...'
+      };
     }
   };
 
   return (
     <div className="grid grid-cols-8 gap-1.5 p-3 bg-white/5 rounded-2xl border border-white/5 mt-2">
-      {rules.map((rule) => (
-        <div key={rule.id} className="group relative">
-          <div className={`w-2.5 h-2.5 rounded-full border transition-all duration-500 ${getStatusColor(rule.status)}`} />
-          
-          {/* Tooltip */}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-2.5 rounded-xl bg-slate-900 border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[8px] font-black text-white/40 uppercase">{rule.id}</span>
-              <span className={`text-[7px] font-black uppercase px-1 rounded ${
-                rule.status === 'ok' ? 'bg-primary/20 text-primary' : 
-                rule.status === 'bloqueado' ? 'bg-red-500/20 text-red-400' : 'bg-white/10 text-gray-400'
-              }`}>
-                {rule.status}
-              </span>
+      {rules.map((rule) => {
+        const info = getStatusInfo(rule.status);
+        return (
+          <div key={rule.id} className="group relative">
+            <div className={`w-2.5 h-2.5 rounded-full border transition-all duration-500 ${info.color}`} />
+            
+            {/* Tooltip Detalhado */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 p-3 rounded-xl bg-slate-900 border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[8px] font-black text-white/40 uppercase">{rule.id}</span>
+                <span className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded ${
+                  rule.status === 'ok' ? 'bg-primary/20 text-primary' : 
+                  rule.status === 'bloqueado' ? 'bg-red-500/20 text-red-400' : 
+                  rule.status === 'desativado' ? 'bg-white/5 text-gray-500' : 'bg-amber-400/10 text-amber-400'
+                }`}>
+                  {info.label}
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-white leading-tight mb-1">{RULE_METADATA[rule.id]?.name}</p>
+              <p className="text-[9px] text-gray-400 leading-tight mb-2 italic">"{RULE_METADATA[rule.id]?.desc}"</p>
+              
+              <div className="pt-2 border-t border-white/5">
+                <p className="text-[8px] font-black text-white/30 uppercase mb-1">Status Atual:</p>
+                <p className={`text-[9px] font-medium leading-relaxed ${
+                  rule.status === 'ok' ? 'text-primary/80' : 
+                  rule.status === 'bloqueado' ? 'text-red-400/80' : 
+                  rule.status === 'desativado' ? 'text-gray-500' : 'text-amber-400/80'
+                }`}>{info.msg}</p>
+              </div>
             </div>
-            <p className="text-[9px] font-bold text-white leading-tight mb-0.5">{RULE_METADATA[rule.id]?.name}</p>
-            <p className="text-[8px] text-gray-500 leading-relaxed italic">{RULE_METADATA[rule.id]?.desc}</p>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -322,11 +351,19 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
             <div className="flex items-center gap-3">
                <div className="flex items-center gap-1">
                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                 <span className="text-[8px] text-gray-600 font-bold">OK</span>
+                 <span className="text-[8px] text-gray-500 font-bold">OK</span>
                </div>
                <div className="flex items-center gap-1">
                  <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                 <span className="text-[8px] text-gray-600 font-bold">BLOCK</span>
+                 <span className="text-[8px] text-gray-500 font-bold">BLOCK</span>
+               </div>
+               <div className="flex items-center gap-1">
+                 <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                 <span className="text-[8px] text-gray-500 font-bold">WAIT</span>
+               </div>
+               <div className="flex items-center gap-1">
+                 <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                 <span className="text-[8px] text-gray-500 font-bold">OFF</span>
                </div>
             </div>
           </div>
