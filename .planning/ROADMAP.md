@@ -139,12 +139,14 @@ Plans:
 3. Seção de "Dicas Pro" para configuração de filtros opcionais.
 4. Deep-links dos tooltips das Settings para a Academy.
 
-### Phase 17: Log Determinístico 100% (Transparência Total)
-**Goal**: Garantir que o `rule_trace` nos logs contenha as 16 regras Fimathe em todas as análises, eliminando qualquer omissão técnica.
+### Phase 17: Dashboard de Performance e Insights (BI)
+**Goal**: Transformar dados brutos de trades em inteligência de trading (Win Rate, Profit Factor, Drawdown, PnL por Ativo) em uma rota dedicada `/stats`.
 **Depends on**: Phase 14
 **Success Criteria**:
-1. Todos os logs do `fimathe_state_engine` contém as chaves FIM-001 a FIM-016.
-2. Status semânticos corretos (ok, bloqueado, pendente, desativado).
+1. Nova rota `/stats` (ou `/performance`) com visual premium de BI.
+2. Gráfico circular de Win Rate (Vitórias/Derrotas).
+3. Gráfico de barras de PnL agrupado por Ativo.
+4. KPIs principais: Profit Factor, Payoff e Drawdown Máximo calculados pelo Backend.
 
 ---
 **Status Atual**: Fase 14 CONCLUÍDA. Conformidade Fimathe 100% Validada (FIM-001 até FIM-016).

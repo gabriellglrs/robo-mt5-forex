@@ -30,11 +30,11 @@ Projeto com Phase 8 finalizada. O motor de decisÃ£o Fimathe foi desacoplado pa
 - [x] Phase 13: TransparÃªncia Financeira (Profit Monitoring)
 - [x] Phase 14: Hardening EstratÃ©gico
 - [x] Phase 16: Central de Educação (Fimathe Academy)
-- [x] Phase 17: Log Determinístico 100% (Transparência Total)
+- [x] Phase 17: Dashboard de Performance e Insights (BI)
 
 ## Estado Atual
-**Fase 17 Shipped** — O robô agora entrega 100% de transparência nos logs, rastreando todas as 16 regras Fimathe sem exceção.
-Configuramos o motor de estados para garantir que o checklist completo (FIM-001 a FIM-016) esteja presente em cada entrada ou bloqueio.
+**Fase 17 Shipped** — Nova central de inteligência (BI) disponível na rota `/stats`. O sistema agora calcula automaticamente Fator de Lucro, Payoff, Drawdown Máximo e distribuição de lucro por ativo.
+A Dashboard principal permanece focada em execução, enquanto a nova área fornece insights profundos para gestão de risco e performance.
 
 ## Entregas fechadas na Phase 7
 - SPEC e Gap Analysis consolidados.
@@ -67,9 +67,14 @@ Configuramos o motor de estados para garantir que o checklist completo (FIM-001 
 - GestÃ£o de risco proativa sem depender de cruzamento de volta (retrataÃ§Ã£o) para proteÃ§Ã£o inicial.
 - 100% de aproveitamento nos testes unitÃ¡rios de ciclo.
 
-## Proximo passo imediato
+## Entregas fechadas na Phase 17 (Performance BI)
+- **Central de Inteligência**: Nova rota `/stats` com visual "Relatório Executivo".
+- **KPIs Profissionais**: Implementação de Fator de Lucro, Payoff Ratio e Win Rate no Backend.
+- **Análise de Risco**: Cálculo automático de Drawdown Máximo Realizado.
+- **Gráficos Dinâmicos**: Curva de Equity Realizada, Distribuição Win/Loss e Ranking de Performance por Ativo (BarChart).
 
-Monitorar performance em conta demo/real e realizar ajustes finos conforme o comportamento do mercado.
+## Proximo passo imediato
+Monitorar a precisão dos dados de performance conforme mais trades são fechados e validar se os cálculos de drawdown refletem fielmente a realidade da conta vinculada.
 
 ## Accumulated Context
 

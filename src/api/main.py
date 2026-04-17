@@ -228,22 +228,23 @@ def get_runtime(user: str = Depends(get_current_user)):
 
 @app.get("/metrics")
 def get_metrics(user: str = Depends(get_current_user)):
+    """Versão simplificada de métricas para o monitor."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        cursor.execute("SELECT SUM(pnl) as total_pnl, COUNT(*) as total_trades FROM trades")
+        cursor.execute("SELECT SUM(pnl) as total_pnl, COUNT(*) as total_trades FROM trades WHERE status = 'CLOSED'")
         summary = cursor.fetchone()
         
-        cursor.execute("SELECT COUNT(*) as win_count FROM trades WHERE pnl > 0")
+        cursor.execute("SELECT COUNT(*) as win_count FROM trades WHERE pnl > 0 AND status = 'CLOSED'")
         wins = cursor.fetchone()
         
-        cursor.execute("SELECT * FROM trades ORDER BY entry_time DESC LIMIT 50")
+        cursor.execute("SELECT * FROM trades ORDER BY exit_time DESC LIMIT 50")
         recent_trades = cursor.fetchall()
         
         conn.close()
         
-        total_pnl = summary["total_pnl"] or 0
+        total_pnl = summary["total_pnl"] or 0.0
         total_trades = summary["total_trades"] or 0
         win_rate = (wins["win_count"] / total_trades * 100) if total_trades > 0 else 0
         
@@ -252,6 +253,96 @@ def get_metrics(user: str = Depends(get_current_user)):
             "win_rate": win_rate,
             "total_trades": total_trades,
             "recent_trades": recent_trades
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/performance")
+def get_performance_stats(user: str = Depends(get_current_user)):
+    """Estatísticas avançadas para o Dashboard de BI."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # 1. KPIs Agregados
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_trades,
+                SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as win_count,
+                SUM(CASE WHEN pnl < 0 THEN 1 ELSE 0 END) as loss_count,
+                SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) as gross_profit,
+                SUM(CASE WHEN pnl < 0 THEN pnl ELSE 0 END) as gross_loss,
+                AVG(CASE WHEN pnl > 0 THEN pnl ELSE NULL END) as avg_win,
+                AVG(CASE WHEN pnl < 0 THEN pnl ELSE NULL END) as avg_loss
+            FROM trades 
+            WHERE status = 'CLOSED'
+        """)
+        stats = cursor.fetchone()
+        
+        # 2. PnL por Ativo
+        cursor.execute("""
+            SELECT symbol, SUM(pnl) as total_pnl, COUNT(*) as trade_count
+            FROM trades 
+            WHERE status = 'CLOSED'
+            GROUP BY symbol
+            ORDER BY total_pnl DESC
+        """)
+        by_asset = cursor.fetchall()
+        
+        # 3. Histórico de Trades para Curva de Equity (ordenado por saída)
+        cursor.execute("""
+            SELECT ticket, symbol, pnl, exit_time 
+            FROM trades 
+            WHERE status = 'CLOSED'
+            ORDER BY exit_time ASC
+        """)
+        history = cursor.fetchall()
+        
+        conn.close()
+        
+        # Processamento de métricas
+        total_trades = stats["total_trades"] or 0
+        gross_profit = float(stats["gross_profit"] or 0)
+        gross_loss = abs(float(stats["gross_loss"] or 0))
+        
+        profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (gross_profit if gross_profit > 0 else 0)
+        win_rate = (stats["win_count"] / total_trades * 100) if total_trades > 0 else 0
+        payoff = (float(stats["avg_win"] or 0) / abs(float(stats["avg_loss"] or 1))) if stats["avg_loss"] else 0
+        
+        # Cálculo básico de Max Drawdown (Realizado)
+        cumulative_pnl = 0.0
+        peak = 0.0
+        max_dd = 0.0
+        pnl_curve = []
+        
+        for trade in history:
+            cumulative_pnl += float(trade["pnl"])
+            pnl_curve.append({
+                "time": trade["exit_time"].isoformat() if hasattr(trade["exit_time"], "isoformat") else str(trade["exit_time"]),
+                "pnl": round(cumulative_pnl, 2),
+                "trade_pnl": float(trade["pnl"])
+            })
+            if cumulative_pnl > peak:
+                peak = cumulative_pnl
+            drawdown = peak - cumulative_pnl
+            if drawdown > max_dd:
+                max_dd = drawdown
+
+        return {
+            "summary": {
+                "total_trades": total_trades,
+                "win_rate": round(win_rate, 2),
+                "profit_factor": round(profit_factor, 2),
+                "payoff": round(payoff, 2),
+                "max_drawdown": round(max_dd, 2),
+                "total_pnl": round(cumulative_pnl, 2),
+            },
+            "by_asset": by_asset,
+            "pnl_curve": pnl_curve,
+            "win_loss_distribution": {
+                "wins": stats["win_count"],
+                "losses": stats["loss_count"]
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

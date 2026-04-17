@@ -735,9 +735,14 @@ def main():
                     signal = details.get("signal")
 
                     order_engine = engine["order_engine"]
-                    current_positions = order_engine.get_open_positions(symbol)
-                    open_count = len(current_positions)
-                    current_tickets = {pos.ticket for pos in current_positions}
+                    mt5_positions = order_engine.get_open_positions(symbol)
+                    db_trades = db_manager.get_open_trades(symbol)
+                    
+                    # Consolidacao por tickets unicos para evitar 'Race Conditions' e duplicidade
+                    active_tickets = {p.ticket for p in mt5_positions} | {t["ticket"] for t in db_trades}
+                    open_count = len(active_tickets)
+                    
+                    current_tickets = {pos.ticket for pos in mt5_positions}
                     
                     # Auditoria de Fechamento (Se um ticket sumiu, ele foi fechado)
                     last_tickets = active_tickets_per_symbol.get(symbol, set())

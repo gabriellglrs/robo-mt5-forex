@@ -8,7 +8,14 @@
             "USDJPY",
             "EURGBP",
             "EURJPY",
-            "HK50"
+            "HK50",
+            "NZDUSD",
+            "EURCHF",
+            "AUDJPY",
+            "GBPJPY",
+            "XAUUSD",
+            "XAGUSD",
+            "BTCUSD"
         ],
         "history_years": 2,
         "wick_sensitivity": 0.3,

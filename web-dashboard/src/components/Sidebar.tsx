@@ -17,6 +17,7 @@ import { usePathname } from 'next/navigation';
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
   { icon: Activity, label: 'Monitor Fimathe', href: '/monitor' },
+  { icon: TrendingUp, label: 'Estatísticas', href: '/stats' },
   { icon: Terminal, label: 'Logs & Auditoria', href: '/logs' },
   { icon: Settings, label: 'Configurações', href: '/settings' },
   { icon: GraduationCap, label: 'Fimathe Academy', href: '/academy' },

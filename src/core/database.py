@@ -150,15 +150,21 @@ class DatabaseManager:
             except Exception:
                 pass
 
-    def get_open_trades(self):
-        """Retorna lista de todos os trades com status 'OPEN'."""
-        sql = "SELECT ticket, symbol FROM trades WHERE status = 'OPEN'"
+    def get_open_trades(self, symbol=None):
+        """Retorna lista de todos os trades com status 'OPEN' (opcionalmente filtrado por simbolo)."""
+        if symbol:
+            sql = "SELECT ticket, symbol FROM trades WHERE status = 'OPEN' AND symbol = %s"
+            params = (symbol,)
+        else:
+            sql = "SELECT ticket, symbol FROM trades WHERE status = 'OPEN'"
+            params = ()
+
         conn = None
         cursor = None
         try:
             conn = self.pool.get_connection()
             cursor = conn.cursor(dictionary=True)
-            cursor.execute(sql)
+            cursor.execute(sql, params)
             return cursor.fetchall()
         except Exception as exc:
             self.logger.error(f"Erro ao buscar trades abertos: {exc}")
