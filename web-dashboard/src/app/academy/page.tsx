@@ -18,7 +18,7 @@ import {
   RotateCcw,
   Layers
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const ACADEMY_RULES = [
   {
@@ -203,25 +203,16 @@ const ACADEMY_RULES = [
   }
 ];
 
-export function AcademyContent() {
+function AcademyContent() {
   const searchParams = useSearchParams();
   const ruleParam = searchParams.get('rule');
   const [activeRuleId, setActiveRuleId] = useState('FIM-001');
-  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     if (ruleParam && ACADEMY_RULES.some(r => r.id === ruleParam)) {
       setActiveRuleId(ruleParam);
     }
   }, [ruleParam]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const activeRule = ACADEMY_RULES.find(r => r.id === activeRuleId) || ACADEMY_RULES[0];
 
@@ -243,22 +234,21 @@ export function AcademyContent() {
               <button
                 key={rule.id}
                 onClick={() => setActiveRuleId(rule.id)}
-                className={`w-full flex items-center justify-between px-5 py-3 rounded-2xl text-[11px] font-bold transition-all ${
-                  activeRuleId === rule.id 
+                className={`w-full flex items-center justify-between px-5 py-3 rounded-2xl text-[11px] font-bold transition-all ` + 
+                  (activeRuleId === rule.id 
                     ? 'bg-primary text-black shadow-lg shadow-primary/20' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
+                    : 'text-gray-400 hover:text-white hover:bg-white/5')
+                }
               >
                 <div className="flex items-center gap-3">
-                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${activeRuleId === rule.id ? 'bg-black/20' : 'bg-white/5'}`}>
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ` + (activeRuleId === rule.id ? 'bg-black/20' : 'bg-white/5')}>
                     {rule.id}
                   </span>
                   {rule.name}
                 </div>
-                <ChevronRight className={`w-3 h-3 transition-transform ${activeRuleId === rule.id ? 'rotate-90' : ''}`} />
+                <ChevronRight className={`w-3 h-3 transition-transform ` + (activeRuleId === rule.id ? 'rotate-90' : '')} />
               </button>
             ))}
-            
           </div>
         </div>
       </aside>
@@ -267,7 +257,7 @@ export function AcademyContent() {
       <main className="flex-1 space-y-8">
         
         {/* Header Hero */}
-        <section className="glass p-10 rounded-[48px] border border-white/5 relative overflow-hidden group">
+        <section className="glass p-10 rounded-[48px] border border-white/5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[100px] -mr-32 -mt-32 rounded-full" />
           
           <div className="relative z-10 space-y-6">
@@ -285,9 +275,8 @@ export function AcademyContent() {
                   Fundamentação teórica, lógica de código e diretrizes de configuração para a regra {activeRule.id}.
                 </p>
               </div>
-              <div className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                activeRuleId.startsWith('FIM-00') ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary'
-              }`}>
+              <div className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ` + 
+                (activeRuleId.startsWith('FIM-00') ? 'bg-secondary/10 border-secondary/20 text-secondary' : 'bg-primary/10 border-primary/20 text-primary')}>
                 {activeRule.category}
               </div>
             </div>
@@ -296,10 +285,8 @@ export function AcademyContent() {
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* Theory Block */}
           <motion.div 
-            key={`${activeRuleId}-theory`}
+            key={activeRuleId + "-theory"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="glass p-8 rounded-[40px] border border-white/5 space-y-4"
@@ -313,9 +300,8 @@ export function AcademyContent() {
             </p>
           </motion.div>
 
-          {/* Logic Block */}
           <motion.div 
-            key={`${activeRuleId}-logic`}
+            key={activeRuleId + "-logic"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -330,9 +316,8 @@ export function AcademyContent() {
             </p>
           </motion.div>
 
-          {/* Danger Block */}
           <motion.div 
-            key={`${activeRuleId}-danger`}
+            key={activeRuleId + "-danger"}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -349,9 +334,8 @@ export function AcademyContent() {
             </div>
           </motion.div>
 
-          {/* Pro Tip Block */}
           <motion.div 
-            key={`${activeRuleId}-tip`}
+            key={activeRuleId + "-tip"}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3 }}
@@ -361,7 +345,7 @@ export function AcademyContent() {
               <Lightbulb className="w-24 h-24" />
             </div>
             
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
+            <div className="relative flex flex-col md:flex-row md:items-center gap-6">
               <div className="bg-black/10 p-4 rounded-3xl">
                 <Lightbulb className="w-8 h-8" />
               </div>
@@ -371,15 +355,11 @@ export function AcademyContent() {
                   {activeRule.proTip}
                 </p>
               </div>
-              <button className="md:ml-auto flex items-center gap-2 bg-black px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:bg-black/80 transition-all">
-                Ir para Settings <ArrowRight className="w-3 h-3" />
-              </button>
             </div>
           </motion.div>
-
         </div>
 
-        {/* Generic Help Card */}
+        {/* Support Block */}
         <section className="glass p-10 rounded-[48px] border border-white/5 flex flex-col md:flex-row items-center gap-8">
           <div className="p-10 rounded-full bg-white/5 border border-white/10">
             <Info className="w-12 h-12 text-gray-500" />
@@ -387,7 +367,7 @@ export function AcademyContent() {
           <div className="space-y-4 text-center md:text-left">
             <h3 className="text-xl font-bold text-white">Não encontrou o que procurava?</h3>
             <p className="text-gray-500 text-xs max-w-xl">
-              Nossa documentação é atualizada constantemente com base no feedback da comunidade e mudanças no motor original MetaTrader 5.
+              Nossa documentação é atualizada constantemente com base no feedback da comunidade e mudanças no motor original MT5.
             </p>
             <div className="flex flex-wrap justify-center md:justify-start gap-4">
               <button className="flex items-center gap-2 text-primary font-black text-[10px] uppercase tracking-widest hover:underline">
@@ -399,7 +379,6 @@ export function AcademyContent() {
             </div>
           </div>
         </section>
-
       </main>
     </div>
   );
@@ -407,12 +386,12 @@ export function AcademyContent() {
 
 export default function AcademyPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
-      <AcademyContent />
-    </Suspense>
+    <div className="min-h-screen pt-24 pb-20 px-4 md:px-8">
+       <div className="max-w-7xl mx-auto">
+          <Suspense fallback={<div className="text-white">Carregando...</div>}>
+            <AcademyContent />
+          </Suspense>
+       </div>
+    </div>
   );
 }
