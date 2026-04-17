@@ -332,15 +332,52 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
     }
 
 
+def run_startup_audit(db_manager, engines):
+    """Verifica trades abertos no banco que não estão mais no MT5 (fechados offline)."""
+    logger.info("=== INICIANDO AUDITORIA DE STARTUP ===")
+    open_trades = db_manager.get_open_trades()
+    if not open_trades:
+        logger.info("Nenhum trade aberto no banco para auditar.")
+        return
+
+    for t in open_trades:
+        ticket = t["ticket"]
+        symbol = t["symbol"]
+        
+        # Verifica se o ticket ainda existe nas posições abertas do MT5
+        positions = mt5.positions_get(ticket=int(ticket))
+        if positions is None or len(positions) == 0:
+            logger.warning(f"[Startup Audit] Trade #{ticket} ({symbol}) não encontrado no MT5. Sincronizando fechamento...")
+            
+            # Precisamos do engine do símbolo para sincronizar
+            if symbol in engines:
+                order_engine = engines[symbol]["order_engine"]
+                details = order_engine.sync_position_closure(ticket)
+                if details:
+                    logger.info(f"[Startup Audit] Sucesso ao sincronizar trade #{ticket}. PnL: {details.get('pnl'):.2f}")
+            else:
+                logger.error(f"[Startup Audit] Engine para {symbol} não encontrado. Não foi possível sincronizar o ticket #{ticket}")
+        else:
+            logger.info(f"[Startup Audit] Trade #{ticket} ({symbol}) confirmado como ainda aberto.")
+    
+    logger.info("=== AUDITORIA DE STARTUP FINALIZADA ===")
+
+
 def write_runtime_snapshot(runtime_snapshot):
-    try:
-        os.makedirs(os.path.dirname(FIMATHE_RUNTIME_FILE), exist_ok=True)
-        temp_path = f"{FIMATHE_RUNTIME_FILE}.tmp"
-        with open(temp_path, "w", encoding="utf-8") as file_handle:
-            json.dump(runtime_snapshot, file_handle, indent=2, ensure_ascii=False)
-        os.replace(temp_path, FIMATHE_RUNTIME_FILE)
-    except Exception as exc:
-        logger.error(f"Falha ao gravar snapshot Fimathe: {exc}")
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            os.makedirs(os.path.dirname(FIMATHE_RUNTIME_FILE), exist_ok=True)
+            temp_path = f"{FIMATHE_RUNTIME_FILE}.tmp"
+            with open(temp_path, "w", encoding="utf-8") as file_handle:
+                json.dump(runtime_snapshot, file_handle, indent=2, ensure_ascii=False)
+            os.replace(temp_path, FIMATHE_RUNTIME_FILE)
+            return
+        except (IOError, OSError) as exc:
+            if attempt < max_retries - 1:
+                time.sleep(0.1)
+                continue
+            logger.error(f"Falha persistente ao gravar snapshot Fimathe: {exc}")
 
 
 def _is_better_sl(position_type, candidate_sl, reference_sl, min_step_price):
@@ -554,6 +591,9 @@ def main():
         if not engines:
             logger.error("Nenhum ativo valido disponivel para monitorar.")
             return
+
+        # Auditoria Proativa: Sincroniza trades que podem ter sido fechados enquanto o robô estava offline
+        run_startup_audit(db_manager, engines)
 
         analysis_cfg = settings.get("analysis", {})
         signal_cfg = settings.get("signal_logic", {})

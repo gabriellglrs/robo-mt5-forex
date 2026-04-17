@@ -150,6 +150,25 @@ class DatabaseManager:
             except Exception:
                 pass
 
+    def get_open_trades(self):
+        """Retorna lista de todos os trades com status 'OPEN'."""
+        sql = "SELECT ticket, symbol FROM trades WHERE status = 'OPEN'"
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(sql)
+            return cursor.fetchall()
+        except Exception as exc:
+            self.logger.error(f"Erro ao buscar trades abertos: {exc}")
+            return []
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
     def log_event(self, level, module, message):
         """Grava log de evento no banco de dados."""
         sql = """
