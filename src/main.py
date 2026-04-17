@@ -318,6 +318,7 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
         "grouping_range_points": _safe_round(details.get("grouping_range_points"), 2),
         "breakout_distance_points": breakout_distance_points,
         "near_sr": bool(details.get("near_sr")),
+        "rule_trace": details.get("rule_trace", {}),
         "nearest_level_points": _safe_round(details.get("nearest_level_points"), 2),
         "near_trade_region": bool(details.get("near_trade_region")),
         "nearest_trade_region_points": _safe_round(details.get("nearest_trade_region_points"), 2),
