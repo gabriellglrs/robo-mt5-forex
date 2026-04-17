@@ -119,7 +119,86 @@ Plans:
 4. UI Dashboard: Expor novas regras e o toggle de "Alvo 85%" explicitado no material.
 
 Plans:
-- [x] [implementation_plan.md](file:///C:/Users/gabri/.gemini/antigravity/brain/262d3bc9-f488-4c15-a836-9b0adcf8634f/implementation_plan.md) (Completed & Validated)
+- [x] [implementation_plan.md](file:///C:/Users/gabri/.gemini/antigravity/brain/21b9a612-2f90-40ef-9c62-575d69adcf67/implementation_plan.md) (Completed & Validated)
+
+### Phase 15: Excelência UX - Tooltips Inteligentes Fimathe
+**Goal**: Implementar tooltips premium (balões) sobre o ícone (i) com descrições ricas, propósito e impacto de ativação/desativação para as 16 regras.
+**Depends on**: Phase 14
+**Success Criteria**:
+1. Tooltips premium com framer-motion disparados pelo ícone (i).
+2. Descrições completas (Propósito + Impacto On/Off) para todas as regras.
+3. Design Glassmorphism + Neon alinhado ao tema Cockpit.
+4. Remoção da animação de hover antiga que obstruía os cards.
 
 ---
 **Status Atual**: Fase 14 CONCLUÍDA. Conformidade Fimathe 100% Validada (FIM-001 até FIM-016).
+
+## Backlog Futuro: Web Next.js (nao executar agora)
+
+### Objetivo
+Registrar melhorias futuras da camada web, sem alterar o escopo atual do robo.
+
+### Prioridade P1 (alta)
+1. Seguranca de sessao no frontend:
+   - reduzir dependencia de token em `localStorage`;
+   - implementar fluxo robusto de expiracao/refresh de sessao.
+2. Contrato backend/frontend 100% consistente:
+   - alinhar campos de configuracao (`risk_percent`/`risk_percentage`, `mt5_connection`/core);
+   - garantir que tudo que a UI salva seja realmente consumido pelo robo.
+3. Tratamento padrao de erros de API:
+   - cliente HTTP centralizado com timeout/retry/fallback;
+   - mensagens de erro padronizadas por endpoint.
+4. Validacao forte dos formularios de Settings:
+   - validacao de ranges e bloqueio de combinacoes invalidas antes do POST.
+5. Correcao de build CSS (Tailwind):
+   - remover classes dinamicas do tipo `bg-${...}`/`text-${...}`;
+   - mapear classes estaticas para evitar quebra em build de producao.
+
+### Prioridade P2 (media)
+1. Finalizar acoes placeholder:
+   - implementar `EXPORTAR` em Logs;
+   - remover ou tornar dinamicos indicadores hoje fixos (ex.: fator de lucro estatico).
+2. UX operacional:
+   - trocar `alert/confirm` por modais consistentes;
+   - adicionar aviso de alteracoes nao salvas.
+3. Testes de frontend:
+   - adicionar unit tests e E2E para login, monitor, settings e logs.
+
+### Prioridade P3 (evolutiva)
+1. Acessibilidade e responsividade fina:
+   - auditoria de teclado/foco/contraste/aria;
+   - ajustes mobile para telas densas.
+2. Observabilidade da web:
+   - telemetria de erros JS, latencia e taxa de falhas por rota.
+
+## Backlog Futuro: Web + MT5 (implementacoes funcionais)
+
+### Objetivo
+Registrar funcionalidades pendentes para uso operacional real do robo com MetaTrader 5 via web.
+
+### Prioridade P1 (alta)
+1. Conexao MT5 realmente operacional na UI:
+   - usar de fato server/login/senha/path no backend/core;
+   - incluir botao "Testar conexao".
+2. Validacao de ativos e regras da corretora:
+   - validar simbolo, `volume_min/max/step`, `stops_level`, `freeze_level`, slippage e spread antes da execucao.
+3. Painel de execucao de ordens MT5:
+   - exibir request, `retcode`, comentario da corretora, retries e motivo de falha.
+4. Reconciliacao MT5 x banco:
+   - tela de divergencias entre posicoes/deals do MT5 e tabela `trades`, com acao de correcao.
+5. Controles de risco operacionais:
+   - kill switch global, limite de perda diaria, limite de perdas consecutivas e janela de operacao por ativo.
+
+### Prioridade P2 (media)
+1. Sessoes e filtros de mercado:
+   - filtros por sessao (Londres/NY), bloqueio por spread extremo e opcional de noticias de alto impacto.
+2. Alertas em tempo real:
+   - Telegram/Discord/email para ordem rejeitada, erro critico, robo parado e drawdown elevado.
+3. Historico de configuracoes:
+   - versionamento de settings com autor, timestamp, diff e rollback.
+
+### Prioridade P3 (evolutiva)
+1. Seguranca de producao da web:
+   - sessao robusta, perfis de usuario e CORS restrito por ambiente.
+2. Exportacao e relatorios:
+   - export real (CSV/JSON) de logs/trades e relatorio diario de performance/risco.
