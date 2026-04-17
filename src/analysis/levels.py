@@ -51,28 +51,60 @@ class LevelDetector:
         sensitivity_factor = max(1.0, float(self.wick_sensitivity) * 10.0)
         return point * (10.0 * sensitivity_factor)
 
+    def find_consolidation_zones(self, df, bins=50):
+        """Identifica zonas de densidade de preco (consolidações) usando histograma."""
+        if df is None or df.empty:
+            return []
+        
+        # Usamos Close, Open, High e Low para aumentar a densidade estatistica
+        prices = np.concatenate([
+            df["close"].values, 
+            df["open"].values,
+            df["high"].values,
+            df["low"].values
+        ])
+        
+        counts, bin_edges = np.histogram(prices, bins=bins)
+        
+        # Filtramos apenas os bins com densidade acima da media
+        mean_density = np.mean(counts)
+        zones = []
+        for i in range(len(counts)):
+            if counts[i] > mean_density * 1.2: # 20% acima da media
+                zones.append((bin_edges[i] + bin_edges[i+1]) / 2)
+        
+        return zones
+
     def get_levels_fimathe(self, df, current_price, range_pct=0.10):
-        """Retorna niveis proximos ao preco para as regioes de negociacao da Fimathe."""
-        pivots = self.find_fimathe_pivots(df)
-        if len(pivots) == 0:
+        """Retorna niveis proximos ao preco priorizando zonas de consolidacao (FIM-003)."""
+        # 1. Pega topos e fundos (legado)
+        pivots = self.find_fimathe_pivots(df).flatten()
+        
+        # 2. Pega zonas de consolidacao (Novo: FIM-003)
+        consolidation_zones = self.find_consolidation_zones(df)
+        
+        # Combinamos ambos para ter estrutura completa
+        all_candidates = np.concatenate([pivots, consolidation_zones])
+        
+        if len(all_candidates) == 0:
             return []
 
         lower_bound = current_price * (1 - range_pct)
         upper_bound = current_price * (1 + range_pct)
-        filtered_pivots = pivots[(pivots >= lower_bound) & (pivots <= upper_bound)]
+        filtered = all_candidates[(all_candidates >= lower_bound) & (all_candidates <= upper_bound)]
 
-        if len(filtered_pivots) == 0:
-            filtered_pivots = pivots
+        if len(filtered) == 0:
+            filtered = all_candidates
 
         min_gap = self._get_min_gap()
-        unique_pivots = []
-        sorted_pivots = np.sort(filtered_pivots.flatten())
+        unique_levels = []
+        sorted_levels = np.sort(filtered)
 
-        for pivot in sorted_pivots:
-            if not unique_pivots or abs(pivot - unique_pivots[-1]) > min_gap:
-                unique_pivots.append(float(pivot))
+        for level in sorted_levels:
+            if not unique_levels or abs(level - unique_levels[-1]) > min_gap:
+                unique_levels.append(float(level))
 
-        return sorted(unique_pivots, reverse=True)
+        return sorted(unique_levels, reverse=True)
 
     def get_levels(self, mode=STRATEGY_FIMATHE, n_clusters=None):
         """Mantem compatibilidade de assinatura, mas opera apenas em modo Fimathe."""

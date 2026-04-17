@@ -23,7 +23,11 @@
         "require_channel_break": true,
         "require_sr_touch": false,
         "max_spread_points": 0,
-        "require_pullback_retest": false
+        "require_pullback_retest": false,
+        "strict_reversal_logic": true,
+        "require_structural_trend": true,
+        "triangle_m1_candles": 10,
+        "target_level_mode": "80"
     },
     "risk_management": {
         "risk_percent": 2.5,

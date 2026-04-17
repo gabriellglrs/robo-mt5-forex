@@ -124,6 +124,48 @@ const FIMATHE_RULES = [
     key: 'require_pullback_retest', 
     category: 'signal_logic' 
   },
+  { 
+    id: 'FIM-012', 
+    name: 'Limite de Risco (3%)', 
+    type: 'MANDATORY', 
+    desc: 'Trava de segurança financeira.', 
+    tech: 'Garante que o lote calculado nunca exceda 3% do capital da conta (Regra de Ouro da Página 10).',
+    category: 'risk_management' 
+  },
+  { 
+    id: 'FIM-013', 
+    name: 'Gestão de Alvos', 
+    type: 'MANDATORY', 
+    desc: 'Cálculo dinâmico de TP.', 
+    tech: 'Aplica alvos matemáticos de 80%, 85% ou 100% da expansão conforme parametrizado na gestão de risco.',
+    category: 'risk_management' 
+  },
+  { 
+    id: 'FIM-014', 
+    name: 'Auditoria de Estado', 
+    type: 'MANDATORY', 
+    desc: 'Rastreabilidade total de sinais.', 
+    tech: 'Gera um log determinístico (Rule Trace) para cada sinal, eliminando qualquer entrada baseada em achismo.',
+    category: 'analysis' 
+  },
+  { 
+    id: 'FIM-015', 
+    name: 'Reversão Rigorosa', 
+    type: 'OPTIONAL', 
+    desc: 'Exige 2 níveis + Triângulo M1.', 
+    tech: 'Bloqueia sinais contra a tendência (ex: venda em alta) a menos que o preço tenha caído 2 níveis inteiros e consolidado (Triângulo) por 10 velas no M1.',
+    key: 'strict_reversal_logic', 
+    category: 'signal_logic' 
+  },
+  { 
+    id: 'FIM-016', 
+    name: 'Tendência Estrutural', 
+    type: 'OPTIONAL', 
+    desc: 'Valida Topos e Fundos (H1).', 
+    tech: 'Confirma se a inclinação da média é sustentada por fundos mais altos (em compra) ou topos mais baixos (em venda).',
+    key: 'require_structural_trend', 
+    category: 'signal_logic' 
+  },
 ];
 
 export default function SettingsPage() {
@@ -430,6 +472,25 @@ export default function SettingsPage() {
                       onChange={(e) => updateNested('signal_logic', 'sr_tolerance_points', parseInt(e.target.value))}
                       className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
                    />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Triângulo Fimathe (M1 Velas)</label>
+                   <input 
+                      type="number"
+                      value={settings.signal_logic?.triangle_m1_candles || 10}
+                      onChange={(e) => updateNested('signal_logic', 'triangle_m1_candles', parseInt(e.target.value))}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[10px] text-gray-400 font-bold uppercase ml-2">Modo Take Profit (Nível)</label>
+                   <select 
+                      value={settings.signal_logic?.target_level_mode || '80'}
+                      onChange={(e) => updateNested('signal_logic', 'target_level_mode', e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
+                   >
+                      {['50','80','85','100'].map(lvl => <option key={lvl} value={lvl}>{lvl}%</option>)}
+                   </select>
                 </div>
               </div>
             </section>

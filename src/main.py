@@ -590,7 +590,7 @@ def main():
             "update_min_step_points": max(1, int(risk_cfg.get("trailing_update_min_step_points", 20))),
             "update_cooldown_seconds": max(1, int(risk_cfg.get("trailing_update_cooldown_seconds", 3))),
             "fimathe_cycle_enabled": bool(risk_cfg.get("fimathe_cycle_enabled", True)),
-            "fimathe_cycle_top_level": str(risk_cfg.get("fimathe_cycle_top_level", "80")),
+            "fimathe_cycle_top_level": str(signal_cfg.get("target_level_mode", "80")),
             "fimathe_cycle_top_retrace_points": max(1, int(risk_cfg.get("fimathe_cycle_top_retrace_points", 45))),
             "fimathe_cycle_min_profit_points": max(1, int(risk_cfg.get("fimathe_cycle_min_profit_points", 80))),
             "fimathe_cycle_protection_buffer_points": max(1, int(risk_cfg.get("fimathe_cycle_protection_buffer_points", 12))),
@@ -686,6 +686,9 @@ def main():
                     engine["signal_detector"].settings = signal_cfg_current
                     
                     risk_cfg_current = settings.get("risk_management", {})
+                    # Inject strategy flags for risk manager
+                    risk_cfg_current["fimathe_target_level"] = settings.get("signal_logic", {}).get("target_level_mode", "80")
+                    
                     engine["risk_manager"].config = risk_cfg_current
                     engine["risk_manager"].settings = risk_cfg_current
 

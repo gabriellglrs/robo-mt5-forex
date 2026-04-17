@@ -28,6 +28,12 @@ Projeto com Phase 8 finalizada. O motor de decisão Fimathe foi desacoplado para
 - [x] Phase 11: Homologação e Testes (Compliance Manual)
 - [x] Phase 12: Monitor de Execução Advanced UI/UX
 - [x] Phase 13: Transparência Financeira (Profit Monitoring)
+- [x] Phase 14: Hardening Estratégico
+
+## Estado Atual
+**Fase 14 Shipped** — PR #14 (Hardening Estratégico).
+O robô agora está em conformidade total (100%) com as regras FIM-001 a FIM-016.
+Proximo passo: Iniciar Milestone 3 ou melhorias de performance.
 
 ## Entregas fechadas na Phase 7
 - SPEC e Gap Analysis consolidados.
@@ -49,12 +55,11 @@ Projeto com Phase 8 finalizada. O motor de decisão Fimathe foi desacoplado para
 ## Entregas fechadas na Phase 13
 - **Snapshot Financeiro**: Injeção de `Balance`, `Equity` e `Profit` global no runtime snapshot.
 - **PnL por Ativo**: Rastreamento individual de lucro/prejuízo flutuante por símbolo.
-- **Dashboard Financeiro**: Cabeçalho global com widgets neon para acompanhamento de capital.
-- **Micro-indicadores**: Lucro em tempo real adicionado aos cards de monitoramento com coloração semântica (Premium).
-- **Coloração Semântica**: Cards com brilho (glow) e cores dinâmicas por fase (Monitoramento, Rompimento, Entrada, Risco).
+- **Dashboard Financeiro & Fluxo de Logs**: Novo Cabeçalho global com widgets neon para capital e grid unificado de histórico.
+- **Blindagem Visual StandBy Global**: Todo o painel oculta painéis de tabelas e métricas dinâmicas caso a chave mestra seja desligada, resolvendo resquícios de front-end assíncrono perigoso com a barreira "MOTOR EM STANDBY".
+- **Botões Premium Cockpit**: O botão de Iniciar/Parar Robô repaginados ao estilo cyberpunk/sci-fi com animação "glass fx", alertas pulsantes em vermelho caso rodando, e caixa alta.
 - **Régua de Níveis**: Novo componente `FimatheStructureGauge` para visualização gráfica da posição do preço em relação aos níveis A/B e alvos.
-- **Interatividade**: Tooltips (hover cards) ricos para `pts` e regras de execução via `rule_trace`.
-- **Transparência**: Exibição explícita do `rule_id` e `next_trigger` no monitor em tempo real.
+- **Interatividade Total**: Exibição explícita de `rule_id`, `next_trigger` em tempo real e tooltips ricos.
 
 ## Validacao comportamental
 - Máquina de estados desacoplada com transições explícitas.

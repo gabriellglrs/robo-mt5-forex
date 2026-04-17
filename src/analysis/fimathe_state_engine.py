@@ -45,10 +45,20 @@ def resolve_rule_meta(reason, signal=None):
             "Reteste (Pullback)",
             "Aguardar pullback/reteste dentro da tolerancia.",
         ),
-        "longe_do_nivel_sr": (
+        "long_do_nivel_sr": (
             "FIM-008",
             "Regra anti-achometro",
             "Aguardar toque/regiao S-R para completar confluencia.",
+        ),
+        "reversao_bloqueada": (
+            "FIM-015",
+            "Reversao Rigorosa",
+            "Exige queda de 2 niveis + Triangulo para operar contra a tendencia.",
+        ),
+        "tendencia_sem_confluencia": (
+            "FIM-016",
+            "Tendencia Estrutural",
+            "Aguardar confirmacao de Topos/Fundos (HH/LL) no H1.",
         ),
         "spread_alto": (
             "FIM-009",
@@ -80,6 +90,8 @@ def evaluate_state_machine(technicals, settings):
     require_sr_touch = settings.get("require_sr_touch", True)
     require_breakout = settings.get("require_channel_break", True)
     require_pullback = settings.get("require_pullback_retest", True)
+    require_structural = settings.get("require_structural_trend", True)
+    strict_reversal = settings.get("strict_reversal_logic", True)
     max_spread = float(settings.get("max_spread_points", 0))
 
     def get_rule_status(is_ok, is_required):
@@ -90,6 +102,7 @@ def evaluate_state_machine(technicals, settings):
     rule_trace = {
         "FIM-001": "pendente",
         "FIM-002": "pendente",
+        "FIM-016": "desativado" if not require_structural else "pendente",
         "FIM-003": "pendente",
         "FIM-004": "ok", # Referencia temporal
         "FIM-005": "pendente",
@@ -97,6 +110,7 @@ def evaluate_state_machine(technicals, settings):
         "FIM-007": "desativado" if not require_breakout else "pendente",
         "FIM-011": "desativado" if not require_pullback else "pendente",
         "FIM-008": "desativado" if not require_sr_touch else "pendente",
+        "FIM-015": "desativado" if not strict_reversal else "pendente",
         "FIM-009": "desativado" if max_spread <= 0 else "pendente",
     }
 
@@ -112,11 +126,23 @@ def evaluate_state_machine(technicals, settings):
             **resolve_rule_meta(reason)
         }
 
-    # 2. Check trend
+    # 2. Check trend (FIM-002)
     trend_direction = technicals.get("trend_direction")
     rule_trace["FIM-002"] = "ok" if trend_direction else "bloqueado_lateral"
     if trend_direction is None:
         reason = "mercado_lateral"
+        return {
+            "signal": None,
+            "reason": reason,
+            "rule_trace": rule_trace,
+            **resolve_rule_meta(reason)
+        }
+
+    # 2b. Structural Trend (FIM-016)
+    structural_ok = technicals.get("structural_ok", False)
+    rule_trace["FIM-016"] = get_rule_status(structural_ok, require_structural)
+    if require_structural and not structural_ok:
+        reason = "tendencia_sem_confluencia"
         return {
             "signal": None,
             "reason": reason,
@@ -200,7 +226,19 @@ def evaluate_state_machine(technicals, settings):
             **resolve_rule_meta(reason)
         }
 
-    # 7. S/R Proximity Check (FIM-008)
+    # 8. Reversal Check (FIM-015)
+    reversal_ok = technicals.get("reversal_ok", True)
+    rule_trace["FIM-015"] = get_rule_status(reversal_ok, strict_reversal)
+    if strict_reversal and not reversal_ok:
+        reason = "reversao_bloqueada"
+        return {
+            "signal": None,
+            "reason": reason,
+            "rule_trace": rule_trace,
+            **resolve_rule_meta(reason)
+        }
+
+    # 9. S/R Proximity Check (FIM-008)
     near_sr = technicals.get("near_sr", False)
     rule_trace["FIM-008"] = get_rule_status(near_sr, require_sr_touch)
     
@@ -213,7 +251,7 @@ def evaluate_state_machine(technicals, settings):
             **resolve_rule_meta(reason)
         }
 
-    # 8. Setup Ready
+    # 10. Setup Ready
     signal = technicals.get("candidate_signal")
     reason = "setup_pronto"
     

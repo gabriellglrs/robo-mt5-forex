@@ -91,7 +91,35 @@ Plans:
 4. Rebuild da infraestrutura Docker para suportar as mudanças de UI.
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 13 to break down)
+- [x] **Phase 14: Rigorous Strategy Hardening (Full Alignment)**
+  - [x] Lógica de Reversão FIM-015 (2 níveis + 10-candle triangle).
+  - [x] Tendência Estrutural FIM-016 (Topos/Fundos).
+  - [x] Marcação A/B por Densidade/Consolidação.
+  - [x] Sincronização total com Web Dashboard.
+
+### Phase 13: Financial Transparency & Profit Monitoring
+**Goal**: Implementar monitoramento financeiro em tempo real com exibição de saldo, equidade e lucro flutuante (PnL) por ativo no dashboard.
+**Depends on**: Phase 12
+**Success Criteria**:
+1. Informações da conta (Saldo, Lucro Aberto) exibidas no cabeçalho do monitor.
+2. Cada card de ativo exibe seu lucro/prejuízo flutuante atual com coloração semântica.
+3. Dados financeiros integrados ao snapshot de runtime gerado pelo robô.
+4. Rebuild da infraestrutura Docker para suportar as mudanças de UI.
+
+Plans:
+- [x] TBD (run /gsd-plan-phase 13 to break down)
+
+### Phase 14: Rigorous Strategy Hardening (Full Alignment)
+**Goal**: Trazer o robô para 100% de conformidade com o documento FIMATHE-ESTRATEGIA.md, focando em endurecer as regras de entrada e reversão.
+**Depends on**: Phase 13
+**Success Criteria**:
+1. Regra FIM-015: Venda em tendência de alta só permitida após queda de 2 níveis + triângulo (10 velas M1).
+2. Regra FIM-016: Confirmação de tendência por Topos/Fundos ascendentes/descendentes.
+3. Regra FIM-003: Pontos A/B detectados por clusters de preço (densidade) em vez de picos isolados.
+4. UI Dashboard: Expor novas regras e o toggle de "Alvo 85%" explicitado no material.
+
+Plans:
+- [x] [implementation_plan.md](file:///C:/Users/gabri/.gemini/antigravity/brain/262d3bc9-f488-4c15-a836-9b0adcf8634f/implementation_plan.md) (Completed & Validated)
 
 ---
-**Status Atual**: Fase 12 CONCLUÍDA. Monitor de Execução Premium operando com visualizador de níveis e hover cards.
+**Status Atual**: Fase 14 CONCLUÍDA. Conformidade Fimathe 100% Validada (FIM-001 até FIM-016).

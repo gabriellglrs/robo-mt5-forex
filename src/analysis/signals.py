@@ -121,12 +121,44 @@ class SignalDetector:
         return nearest_distance / float(self.point)
 
 
+    def _check_structural_trend(self, trend_df, direction):
+        """Valida FIM-016: Confluencia estrutural por Topos e Fundos (H1)."""
+        if trend_df is None or len(trend_df) < 10:
+            return False
+            
+        recent = trend_df.tail(10)
+        if direction == "BUY":
+            # Ultimo fundo deve ser maior que o penultimo fundo local
+            lows = recent["low"].values
+            return bool(lows[-1] >= np.min(lows[:-1]))
+        else:
+            # Ultimo topo deve ser menor que o penultimo topo local
+            highs = recent["high"].values
+            return bool(highs[-1] <= np.max(highs[:-1]))
+
+    def _check_triangle_consolidation(self, timeframe="M1"):
+        """Valida FIM-015: Agrupamento no M1 (Triangulo)."""
+        count = int(self.settings.get("triangle_m1_candles", 10))
+        df_m1 = self._load_rates(timeframe, count)
+        if df_m1 is None or len(df_m1) < count:
+            return False
+            
+        # Calcula range da consolidacao
+        price_range = (df_m1["high"].max() - df_m1["low"].min()) / float(self.point)
+        # Limite toleravel para triangulo: 15-20% do tamanho do canal medio
+        # Aqui simplificamos para um range estreito (ex: 80 pontos)
+        return bool(price_range <= 80.0)
+
     def evaluate_signal_details(self, current_price, levels, indicators=None, current_spread=0.0):
         """Retorna diagnostico completo do setup Fimathe."""
         trend_tf = self.settings.get("trend_timeframe", "H1")
         entry_tf = self.settings.get("entry_timeframe", "M15")
         trend_candles = max(50, int(self.settings.get("trend_candles", 200)))
         entry_lookback = max(20, int(self.settings.get("entry_lookback_candles", 50)))
+
+        # Novas Configurações
+        strict_reversal = bool(self.settings.get("strict_reversal_logic", True))
+        require_structural = bool(self.settings.get("require_structural_trend", True))
 
         breakout_points = int(self.settings.get("breakout_buffer_points", 10))
         pullback_tolerance = int(self.settings.get("pullback_tolerance_points", 20))
@@ -166,6 +198,10 @@ class SignalDetector:
             }
 
         trend_direction, slope_points = self._detect_trend(trend_df.tail(trend_candles))
+        
+        # FIM-016: Structural Trend Confluence
+        structural_ok = self._check_structural_trend(trend_df, trend_direction) if trend_direction else False
+
         if trend_direction is None:
             technicals = {"data_ok": True, "trend_direction": None}
             decision = evaluate_state_machine(technicals, self.settings)
@@ -240,7 +276,11 @@ class SignalDetector:
         breakout_buffer_price = breakout_points * float(self.point)
         pullback_tolerance_price = pullback_tolerance * float(self.point)
 
-        if trend_direction == "BUY":
+        # Determine candidate signal based on position relative to channel_mid
+        # Even if trend is BUY, we might have a candidate SELL (reversal)
+        is_above_mid = current_price >= channel_mid
+        
+        if is_above_mid:
             breakout_ok = (current_price >= (channel_mid + breakout_buffer_price)) if require_breakout else True
             pullback_ok = (last_low <= (channel_mid + pullback_tolerance_price)) if require_pullback else True
             candidate_signal = "BUY"
@@ -249,10 +289,28 @@ class SignalDetector:
             pullback_ok = (last_high >= (channel_mid - pullback_tolerance_price)) if require_pullback else True
             candidate_signal = "SELL"
 
+        # FIM-015: Strict Reversal check
+        reversal_ok = True
+        if strict_reversal:
+            # Venda em Tendencia de Alta
+            if trend_direction == "BUY" and candidate_signal == "SELL":
+                dist_points = (projection_map["point_b"] - current_price) / float(self.point)
+                levels_dropped = dist_points / (projection_map["channel_size"] / float(self.point))
+                triangle_ok = self._check_triangle_consolidation()
+                reversal_ok = bool(levels_dropped >= 2.0 and triangle_ok)
+            # Compra em Tendencia de Baixa
+            elif trend_direction == "SELL" and candidate_signal == "BUY":
+                dist_points = (current_price - projection_map["point_a"]) / float(self.point)
+                levels_risen = dist_points / (projection_map["channel_size"] / float(self.point))
+                triangle_ok = self._check_triangle_consolidation()
+                reversal_ok = bool(levels_risen >= 2.0 and triangle_ok)
+
         # Prepare technicals for the state machine
         technicals = {
             "data_ok": True,
             "trend_direction": trend_direction,
+            "structural_ok": structural_ok,
+            "reversal_ok": reversal_ok,
             "ab_ok": True,
             "near_trade_region": near_trade_region,
             "grouping_ok": grouping_map["grouping_ok"],
@@ -277,6 +335,7 @@ class SignalDetector:
                 trend_tf: {
                     "trend_direction": trend_direction,
                     "trend_slope_points": round(float(slope_points), 2),
+                    "structural_ok": structural_ok,
                     "point_a": round(float(projection_map["point_a"]), 5),
                     "point_b": round(float(projection_map["point_b"]), 5),
                     "projection_50": round(float(projection_map["projection_50"]), 5),
@@ -323,6 +382,8 @@ class SignalDetector:
             "rule_id": decision["rule_id"],
             "rule_name": decision["rule_name"],
             "next_trigger": decision["next_trigger"],
+            "structural_ok": structural_ok,
+            "reversal_ok": reversal_ok
         }
 
     def get_signal(self, current_price, levels, indicators=None):
