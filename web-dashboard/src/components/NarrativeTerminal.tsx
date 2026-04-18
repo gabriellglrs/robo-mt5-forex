@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useReducer, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Cpu, Zap, ShieldAlert, Bot, TrendingUp, Brain, Info, Crosshair, Lock } from 'lucide-react';
+import { Terminal, Cpu, Zap, ShieldAlert, Bot, TrendingUp, Brain, Info, Crosshair } from 'lucide-react';
 import type { FimatheAsset } from '@/types';
 
 type RuntimeEvent = {
@@ -27,7 +27,20 @@ type RuntimeAssetExt = FimatheAsset & {
   near_trade_region?: boolean;
   nearest_trade_region_points?: number;
   sr_tolerance_points?: number;
-  box_locked?: boolean;
+};
+
+const BLOCK_REASON_HINTS: Record<string, string> = {
+  'FIM-001': 'faltam dados suficientes de mercado/candles.',
+  'FIM-002': 'tendencia principal ainda nao esta clara.',
+  'FIM-003': 'estrutura A/B ainda nao foi validada.',
+  'FIM-005': 'preco ainda esta fora da regiao negociavel.',
+  'FIM-006': 'agrupamento no timeframe de entrada ainda nao confirmou.',
+  'FIM-007': 'rompimento do canal ainda nao confirmou com buffer.',
+  'FIM-008': 'faltou confluencia de suporte/resistencia.',
+  'FIM-009': 'spread atual esta acima do limite.',
+  'FIM-011': 'reteste (pullback) ainda nao confirmou.',
+  'FIM-015': 'criterio de reversao rigorosa nao foi atendido.',
+  'FIM-016': 'confluencia estrutural (topos/fundos) ainda nao confirmou.',
 };
 
 interface NarrativeTerminalProps {
@@ -67,29 +80,45 @@ function mapLogType(level?: string): NarrativeMessage['type'] {
   return 'log';
 }
 
-function buildAiNarrative(asset: RuntimeAssetExt): { text: string; type: NarrativeMessage['type'] } {
+function buildAiNarrative(asset: RuntimeAssetExt): Array<{ text: string; type: NarrativeMessage['type'] }> {
   const rule = asset.rule_id || 'FIM-014';
   const status = asset.status_text || 'Monitorando setup.';
   const trigger = asset.next_trigger || 'Aguardando proximo gatilho tecnico.';
   const trend = asset.trend_direction || 'LATERAL';
   const trendTf = asset.trend_timeframe || 'H1';
   const entryTf = asset.entry_timeframe || 'M15';
+  const blockedFromTrace = Object.entries(asset.rule_trace || {}).find(([, status]) => status === 'bloqueado')?.[0];
+  const blockedRule = asset.rule_id || blockedFromTrace;
+  const blockedHint = blockedRule ? BLOCK_REASON_HINTS[blockedRule] : undefined;
 
-  const base =
-    `Analise operacional: regra ativa ${rule}. Estado atual: ${status} ` +
-    `Leitura de tendencia: ${trend} em ${trendTf}, execucao em ${entryTf}. ` +
-    `Acao corretiva objetiva: ${trigger}`;
+  const lines: Array<{ text: string; type: NarrativeMessage['type'] }> = [
+    { text: `Regra ativa: ${rule}`, type: 'ai' },
+    { text: `Estado atual: ${status}`, type: 'info' },
+    { text: `Leitura de tendencia: ${trend} em ${trendTf} | execucao em ${entryTf}`, type: 'ai' },
+  ];
+
+  if (blockedRule && blockedHint) {
+    lines.push({
+      text: `Bloqueio ativo em ${blockedRule}: ${blockedHint}`,
+      type: 'warning',
+    });
+    lines.push({
+      text: `Para destravar ${blockedRule}: ${trigger}`,
+      type: 'info',
+    });
+  } else {
+    lines.push({ text: `Acao corretiva: ${trigger}`, type: 'warning' });
+  }
 
   if (asset.signal) {
-    return { text: `${base} Gatilho confirmado (${asset.signal}).`, type: 'success' };
+    lines.push({ text: `Gatilho confirmado (${asset.signal}).`, type: 'success' });
+  } else if ((asset.open_positions || 0) > 0) {
+    lines.push({ text: 'Posicao em curso sob gestao de risco.', type: 'info' });
+  } else if (asset.reason === 'reversao_bloqueada' || asset.reason === 'fora_da_regiao_negociavel') {
+    lines.push({ text: 'Bloqueio tecnico ativo, sem permissao de entrada.', type: 'warning' });
   }
-  if ((asset.open_positions || 0) > 0) {
-    return { text: `${base} Posicao em curso sob gestao de risco.`, type: 'info' };
-  }
-  if (asset.reason === 'reversao_bloqueada' || asset.reason === 'fora_da_regiao_negociavel') {
-    return { text: `${base} Bloqueio tecnico ativo, sem permissao de entrada.`, type: 'warning' };
-  }
-  return { text: base, type: 'ai' };
+
+  return lines;
 }
 
 function buildProximityHint(asset: RuntimeAssetExt): { text: string; type: NarrativeMessage['type'] } | null {
@@ -216,7 +245,7 @@ export default function NarrativeTerminal({ assetRuntime, recentEvents }: Narrat
     const heartbeat = now - lastAiAtRef.current > 30000;
     if (!changed && !heartbeat) return;
 
-    const ai = buildAiNarrative(assetRuntime);
+    const aiLines = buildAiNarrative(assetRuntime);
     const extraMessages: NarrativeMessage[] = [];
 
     const openPos = assetRuntime.open_positions || 0;
@@ -288,12 +317,12 @@ export default function NarrativeTerminal({ assetRuntime, recentEvents }: Narrat
     dispatch({
       type: 'append',
       items: [
-        {
-          id: `ai-${now}`,
-          text: ai.text,
-          type: ai.type,
+        ...aiLines.map((item, idx) => ({
+          id: `ai-${now}-${idx}`,
+          text: item.text,
+          type: item.type,
           timestamp: new Date().toLocaleTimeString(),
-        },
+        })),
         ...extraMessages,
       ],
     });
@@ -349,16 +378,6 @@ export default function NarrativeTerminal({ assetRuntime, recentEvents }: Narrat
           <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           <span className="text-[9px] font-black text-primary/80 uppercase tracking-widest">Event Stream</span>
         </div>
-        {assetRuntime?.box_locked && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/30 shadow-[0_0_10px_rgba(14,165,233,0.2)]"
-          >
-            <Lock className="w-3 h-3 text-sky-400 animate-pulse" />
-            <span className="text-[9px] font-black text-sky-400 uppercase tracking-tighter">Caixote Travado</span>
-          </motion.div>
-        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar font-mono scroll-smooth">
