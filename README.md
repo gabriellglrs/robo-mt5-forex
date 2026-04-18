@@ -68,4 +68,4 @@ Clone o repositório e rode o script de inicialização automática:
 > [!IMPORTANT]
 > **AVISO LEGAL**: Trading no mercado de Forex envolve risco significativo. Este robô é uma ferramenta de auxílio operacional e não garante lucros. Teste sempre em conta DEMO antes de ir para conta REAL.
 
-*Desenvolvido pela equipe GSD - Get Shit Done Architecture.*
+*Desenvolvido pelo Engenheiro de Software: gabriel lucas.*
