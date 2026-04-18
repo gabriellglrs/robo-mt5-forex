@@ -682,13 +682,13 @@ export default function SettingsPage() {
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
-                        Lookback Histórico (Velas)
-                        <InfoTooltip title={SETTINGS_HELP.trend_candles.title} content={SETTINGS_HELP.trend_candles.content} />
+                        Largura do Canal (Velas)
+                        <InfoTooltip title="Lookback do Canal Fimathe" content="Define a quantidade de velas no Timeframe de Tendência para pescar a Máxima (A) e Mínima (B). Diminua para canais mais justos." />
                       </label>
                        <input 
                           type="number" 
-                          value={settings.analysis?.trend_candles || 200}
-                          onChange={(e) => updateNested('analysis', 'trend_candles', parseInt(e.target.value))}
+                          value={settings.analysis?.ab_lookback_candles || 80}
+                          onChange={(e) => updateNested('analysis', 'ab_lookback_candles', parseInt(e.target.value))}
                           className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-secondary transition-all"
                        />
                     </div>

@@ -11,6 +11,7 @@ import signal
 import subprocess
 import time
 import ctypes
+import MetaTrader5 as mt5
 from datetime import datetime
 from typing import List, Optional
 
@@ -24,6 +25,10 @@ import bcrypt
 from pydantic import BaseModel
 
 from src.core.database import DatabaseManager
+
+# --- INICIALIZACAO MT5 (GLOBAL PARA PERFORMANCE) ---
+if not mt5.initialize():
+    print(f"AVISO: Nao foi possivel inicializar o MT5 na API. Erro: {mt5.last_error()}")
 
 # --- CONFIGURACOES ---
 SETTINGS_FILE = os.path.join(PROJECT_ROOT, "config", "settings.json")
@@ -245,12 +250,6 @@ def get_runtime(user: str = Depends(get_current_user)):
 
 @app.get("/api/chart/{symbol}")
 def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current_user)):
-    import MetaTrader5 as mt5
-    
-    # Initialization
-    if not mt5.initialize():
-        raise HTTPException(status_code=500, detail=f"Terminal MT5 não inicializado. Erro: {mt5.last_error()}")
-    
     # Mapping timeframe string to MT5 timeframe constants
     timeframe_map = {
         "M1": mt5.TIMEFRAME_M1,

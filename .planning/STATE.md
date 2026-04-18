@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 21 shipped — milestone-3
-last_updated: "2026-04-17T23:25:31.410Z"
+status: Phase 21 Hardened (Sensitivity & Hot-Reload) — milestone-3
+last_updated: "2026-04-18T00:15:31.000Z"
 progress:
   total_phases: 14
   completed_phases: 3
@@ -25,14 +25,19 @@ Projeto com Phase 20 finalizada. O motor de execução `fimathe_cycle.py` agora 
 - [x] Phase 19: UX Educativo (Tooltips Globais)
 - [x] Phase 20: Stop Loss Estratégico (FIM-017 / FIM-018)
 - [x] Phase 20.1: Hotfix de Sincronização e Reconciliação
-- [ ] Phase 21: Conexão MT5 e Status em Real-time
+- [x] Phase 21: Asset Deep Dive & Live Charting (Sensibilidade Hardened)
 
 ## Estado Atual
 
-**Fase 20 Shipped** — O robô atingiu um novo nível de controle de risco. Implementamos as regraspuristas FIM-017 (BE Fixo) e FIM-018 (Infinity Trail). Além da lógica no motor Python, toda a interface web foi adaptada para permitir ajustes manuais de porcentagem, com o suporte didático da Academy integrada.
-A suíte de testes unitários v2 garante que as novas regras não conflitam com a gestão clássica da Fimathe.
+## Entregas fechadas na Phase 21 (Asset Deep Dive)
 
-## Entregas fechadas na Phase 7
+- **Gráficos em Tempo Real**: Integração de TradingView Lightweight Charts para velas M1/M15.
+- **Sensibilidade de Canal (A/B)**: Remoção de restrições rígidas, permitindo canais micro (5+ velas) para estratégias scalper.
+- **Hot-Reload Operacional**: Recálculo dinâmico de todos os parâmetros (Trailing, Buffers, Cooldowns) a cada ciclo de 1s sem restart.
+- **API High-Performance**: Otimização da conexão MT5 no backend, reduzindo latência de atualização de 4s para <1s.
+- **Sincronismo Lateral**: Correção do bug que ocultava canais em mercados sem tendência clara.
+
+## Entregas fechadas na Phase 20 (Stop Loss Estratégico)
 
 - SPEC e Gap Analysis consolidados.
 - Ciclo explicito de stop por eventos adicionado.

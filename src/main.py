@@ -93,6 +93,11 @@ def build_symbol_engines(symbols, settings, db_manager):
         if not entry_tf:
             entry_tf = legacy_timeframes[0] if legacy_timeframes else "M15"
             signal_logic_settings["entry_timeframe"] = entry_tf
+            
+        # Repassa chaves que ficam declaradas em 'analysis' no frontend para o motor de sinal
+        signal_logic_settings["trend_candles"] = analysis_cfg.get("trend_candles", 200)
+        signal_logic_settings["ab_lookback_candles"] = analysis_cfg.get("ab_lookback_candles", 80)
+        
         signal_detector = SignalDetector(symbol, signal_logic_settings)
 
         # Busca a configuracao ativa no banco para auditoria
@@ -606,40 +611,7 @@ def main():
         # Auditoria Proativa: Sincroniza trades que podem ter sido fechados enquanto o robô estava offline
         run_startup_audit(db_manager, engines)
 
-        analysis_cfg = settings.get("analysis", {})
-        signal_cfg = settings.get("signal_logic", {})
-        risk_cfg = settings.get("risk_management", {})
-        breakout_buffer_points = max(0, int(signal_cfg.get("breakout_buffer_points", 10)))
-        trend_tf = signal_cfg.get("trend_timeframe")
-        entry_tf = signal_cfg.get("entry_timeframe")
-        if trend_tf and entry_tf:
-            timeframes = list(dict.fromkeys([entry_tf, trend_tf]))
-        else:
-            timeframes = analysis_cfg.get("timeframes", ["M5", "M15"])
-        symbol_cooldown_seconds = int(risk_cfg.get("symbol_cooldown_seconds", 300))
-        if symbol_cooldown_seconds < 0:
-            symbol_cooldown_seconds = 0
-        trailing_cfg = {
-            "enabled": bool(risk_cfg.get("trailing_enabled", True)),
-            "activation_points": max(1, int(risk_cfg.get("trailing_activation_points", 150))),
-            "sl_distance_points": max(1, int(risk_cfg.get("trailing_sl_distance_points", 120))),
-            "tp_enabled": bool(risk_cfg.get("trailing_tp_enabled", True)),
-            "tp_distance_points": max(1, int(risk_cfg.get("trailing_tp_distance_points", 250))),
-            "breakeven_enabled": bool(risk_cfg.get("use_breakeven", False)),
-            "breakeven_trigger_points": max(1, int(risk_cfg.get("breakeven_trigger_points", 120))),
-            "breakeven_offset_points": max(0, int(risk_cfg.get("breakeven_offset_points", 5))),
-            "update_min_step_points": max(1, int(risk_cfg.get("trailing_update_min_step_points", 20))),
-            "update_cooldown_seconds": max(1, int(risk_cfg.get("trailing_update_cooldown_seconds", 3))),
-            "fimathe_cycle_enabled": bool(risk_cfg.get("fimathe_cycle_enabled", True)),
-            "fimathe_cycle_top_level": str(signal_cfg.get("target_level_mode", "80")),
-            "fimathe_cycle_top_retrace_points": max(1, int(risk_cfg.get("fimathe_cycle_top_retrace_points", 45))),
-            "fimathe_cycle_min_profit_points": max(1, int(risk_cfg.get("fimathe_cycle_min_profit_points", 80))),
-            "fimathe_cycle_protection_buffer_points": max(1, int(risk_cfg.get("fimathe_cycle_protection_buffer_points", 12))),
-            "fimathe_cycle_breakeven_offset_points": max(0, int(risk_cfg.get("fimathe_cycle_breakeven_offset_points", 5))),
-        }
-        analysis_flow_interval_seconds = int(settings.get("ui_settings", {}).get("analysis_flow_interval_seconds", 15))
-        if analysis_flow_interval_seconds < 5:
-            analysis_flow_interval_seconds = 5
+        # Cache de controle de logs e temporizadores (Mantidos fora do loop)
         last_analysis_log_per_symbol = {symbol: 0.0 for symbol in engines.keys()}
         last_logged_reason_per_symbol = {symbol: None for symbol in engines.keys()}
         last_logged_signal_per_symbol = {symbol: None for symbol in engines.keys()}
@@ -653,10 +625,10 @@ def main():
         runtime_snapshot["status"] = "running"
         runtime_snapshot["symbols"] = {}
         runtime_snapshot["recent_events"] = []
-
+        
         loop_counter = 0
         while True:
-            # Recarrega configurações para captar mudanças da UI
+            # 1. Recarrega configurações para captar mudanças da UI
             new_settings = load_settings()
             if new_settings:
                 settings = new_settings
@@ -667,16 +639,42 @@ def main():
                 
                 if set(current_config_symbols) != set(active_symbols):
                     logger.info("Mudança detectada na lista de ativos. Recarregando motores...")
-                    # Para simplificar, reconstruímos os motores necessários
-                    # TODO: Otimizar para adicionar/remover apenas o delta
                     new_engines = build_symbol_engines(current_config_symbols, settings, db_manager)
                     if new_engines:
                         engines = new_engines
-                        # Resetar logs de intervalo para os novos ativos
                         for s in engines.keys():
                             if s not in last_analysis_log_per_symbol:
                                 last_analysis_log_per_symbol[s] = 0.0
                                 last_order_ts_per_symbol[s] = 0.0
+
+            # 2. Re-calcula parâmetros dinâmicos para suportar 'Hot-Reload' total sem restart
+            analysis_cfg = settings.get("analysis", {})
+            signal_cfg = settings.get("signal_logic", {})
+            risk_cfg = settings.get("risk_management", {})
+            
+            breakout_buffer_points = max(0, int(signal_cfg.get("breakout_buffer_points", 10)))
+            symbol_cooldown_seconds = max(0, int(risk_cfg.get("symbol_cooldown_seconds", 300)))
+            
+            trailing_cfg = {
+                "enabled": bool(risk_cfg.get("trailing_enabled", True)),
+                "activation_points": max(1, int(risk_cfg.get("trailing_activation_points", 150))),
+                "sl_distance_points": max(1, int(risk_cfg.get("trailing_sl_distance_points", 120))),
+                "tp_enabled": bool(risk_cfg.get("trailing_tp_enabled", True)),
+                "tp_distance_points": max(1, int(risk_cfg.get("trailing_tp_distance_points", 250))),
+                "breakeven_enabled": bool(risk_cfg.get("use_breakeven", False)),
+                "breakeven_trigger_points": max(1, int(risk_cfg.get("breakeven_trigger_points", 120))),
+                "breakeven_offset_points": max(0, int(risk_cfg.get("breakeven_offset_points", 5))),
+                "update_min_step_points": max(1, int(risk_cfg.get("trailing_update_min_step_points", 20))),
+                "update_cooldown_seconds": max(1, int(risk_cfg.get("trailing_update_cooldown_seconds", 3))),
+                "fimathe_cycle_enabled": bool(risk_cfg.get("fimathe_cycle_enabled", True)),
+                "fimathe_cycle_top_level": str(signal_cfg.get("target_level_mode", "80")),
+                "fimathe_cycle_top_retrace_points": max(1, int(risk_cfg.get("fimathe_cycle_top_retrace_points", 45))),
+                "fimathe_cycle_min_profit_points": max(1, int(risk_cfg.get("fimathe_cycle_min_profit_points", 80))),
+                "fimathe_cycle_protection_buffer_points": max(1, int(risk_cfg.get("fimathe_cycle_protection_buffer_points", 12))),
+                "fimathe_cycle_breakeven_offset_points": max(0, int(risk_cfg.get("fimathe_cycle_breakeven_offset_points", 5))),
+            }
+            
+            analysis_flow_interval_seconds = max(5, int(settings.get("ui_settings", {}).get("analysis_flow_interval_seconds", 15)))
 
             is_running = settings.get("running_state", False)
 
@@ -734,7 +732,13 @@ def main():
                     )
 
                     # Atualiza configurações dinâmicas no signal_detector e risk_manager
-                    signal_cfg_current = settings.get("signal_logic", {})
+                    signal_cfg_current = dict(settings.get("signal_logic", {}))
+                    analysis_cfg_current = settings.get("analysis", {})
+                    
+                    # Ponte Crítica: Garante que o Lookback configurado na UI (em analysis) chegue ao motor
+                    signal_cfg_current["trend_candles"] = analysis_cfg_current.get("trend_candles", 200)
+                    signal_cfg_current["ab_lookback_candles"] = analysis_cfg_current.get("ab_lookback_candles", 80)
+                    
                     engine["signal_detector"].settings = signal_cfg_current
                     
                     risk_cfg_current = settings.get("risk_management", {})

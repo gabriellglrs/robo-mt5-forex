@@ -59,7 +59,8 @@ class SignalDetector:
         return None, slope_points
 
     def _build_ab_projection(self, trend_df, trend_direction):
-        lookback = max(30, int(self.settings.get("ab_lookback_candles", 80)))
+        # Permite ao usuário espremer a caixa até 5 velas se desejar canais micro
+        lookback = max(5, int(self.settings.get("ab_lookback_candles", 80)))
         window = trend_df.tail(lookback)
 
         point_a = float(window["high"].max())
@@ -206,10 +207,11 @@ class SignalDetector:
                 **resolve_rule_meta(decision["reason"]),
             }
 
-        trend_direction, slope_points = self._detect_trend(trend_df.tail(trend_candles))
-        
-        # FIM-016: Structural Trend Confluence
-        structural_ok = self._check_structural_trend(trend_df, trend_direction) if trend_direction else False
+        # CÁLCULO DE PROJEÇÃO (Sempre executado para garantir que a UI tenha os níveis atualizados)
+        # Se a tendência for lateral, usamos 'BUY' apenas como base técnica para o lookback, 
+        # mas o sinal continuará bloqueado pela máquina de estados.
+        projection_map = self._build_ab_projection(trend_df, trend_direction or "BUY")
+        ab_ok = projection_map.get("point_a") is not None and projection_map.get("point_b") is not None
 
         if trend_direction is None:
             technicals = {"data_ok": True, "trend_direction": None}
@@ -225,6 +227,10 @@ class SignalDetector:
                     trend_tf: {
                         "trend_direction": "LATERAL",
                         "trend_slope_points": round(float(slope_points), 2),
+                        "point_a": round(float(projection_map["point_a"]), 5) if ab_ok else None,
+                        "point_b": round(float(projection_map["point_b"]), 5) if ab_ok else None,
+                        "projection_50": round(float(projection_map["projection_50"]), 5) if ab_ok else None,
+                        "projection_100": round(float(projection_map["projection_100"]), 5) if ab_ok else None,
                     }
                 },
                 "near_sr": near_sr,
@@ -234,12 +240,18 @@ class SignalDetector:
                 "entry_timeframe": entry_tf,
                 "trend_direction": "LATERAL",
                 "trend_slope_points": round(float(slope_points), 2),
+                "point_a": projection_map["point_a"] if ab_ok else None,
+                "point_b": projection_map["point_b"] if ab_ok else None,
+                "projection_50": projection_map["projection_50"] if ab_ok else None,
+                "projection_80": projection_map.get("projection_80") if ab_ok else None,
+                "projection_85": projection_map.get("projection_85") if ab_ok else None,
+                "projection_100": projection_map["projection_100"] if ab_ok else None,
                 "rule_trace": decision["rule_trace"],
                 **resolve_rule_meta(decision["reason"]),
             }
 
-        projection_map = self._build_ab_projection(trend_df, trend_direction)
-        ab_ok = projection_map.get("point_a") is not None and projection_map.get("point_b") is not None
+        # FIM-016: Structural Trend Confluence
+        structural_ok = self._check_structural_trend(trend_df, trend_direction) if trend_direction else False
         
         if not ab_ok:
             technicals = {"data_ok": True, "trend_direction": trend_direction, "ab_ok": False}
