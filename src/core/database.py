@@ -81,12 +81,41 @@ class DatabaseManager:
         )
         """
 
+        notifications_sql = """
+        CREATE TABLE IF NOT EXISTS notification_events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            event_key VARCHAR(64),
+            event_type VARCHAR(80),
+            category VARCHAR(20),
+            priority VARCHAR(4),
+            severity VARCHAR(12),
+            symbol VARCHAR(20),
+            ticket BIGINT NULL,
+            side VARCHAR(8),
+            rule_id VARCHAR(20),
+            message TEXT,
+            price DOUBLE NULL,
+            sl DOUBLE NULL,
+            tp DOUBLE NULL,
+            metadata_json JSON,
+            status VARCHAR(20),
+            suppression_reason VARCHAR(40) NULL,
+            aggregated_count INT DEFAULT 1,
+            delivery_channel VARCHAR(20),
+            delivery_status VARCHAR(20),
+            delivery_error TEXT NULL,
+            delivered_at DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
         conn = self.pool.get_connection()
         cursor = conn.cursor()
         try:
             cursor.execute(settings_sql)
             cursor.execute(trades_sql)
             cursor.execute(logs_sql)
+            cursor.execute(notifications_sql)
             
             # Adiciona a coluna settings_id caso a tabela trades ja exista (migracao)
             try:
@@ -100,6 +129,141 @@ class DatabaseManager:
         finally:
             cursor.close()
             conn.close()
+
+    def save_notification(self, event: dict):
+        """Registra auditoria de notificacao emitida/suprimida."""
+        sql = """
+        INSERT INTO notification_events (
+            event_key, event_type, category, priority, severity, symbol, ticket, side, rule_id, message,
+            price, sl, tp, metadata_json, status, suppression_reason, aggregated_count,
+            delivery_channel, delivery_status, delivery_error, delivered_at, created_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s, %s
+        )
+        """
+        delivered_at = event.get("delivered_at")
+        delivered_at_dt = None
+        if delivered_at:
+            try:
+                delivered_at_dt = datetime.fromisoformat(str(delivered_at))
+            except Exception:
+                delivered_at_dt = None
+        created_at = event.get("timestamp")
+        created_at_dt = datetime.now()
+        if created_at:
+            try:
+                created_at_dt = datetime.fromisoformat(str(created_at))
+            except Exception:
+                created_at_dt = datetime.now()
+
+        data = (
+            event.get("event_key"),
+            event.get("event_type"),
+            event.get("category"),
+            event.get("priority"),
+            event.get("severity"),
+            event.get("symbol"),
+            event.get("ticket"),
+            event.get("side"),
+            event.get("rule_id"),
+            event.get("message"),
+            event.get("price"),
+            event.get("sl"),
+            event.get("tp"),
+            json.dumps(event.get("metadata") or {}, ensure_ascii=False),
+            event.get("status"),
+            event.get("suppression_reason"),
+            int(event.get("aggregated_count") or 1),
+            event.get("delivery_channel"),
+            event.get("delivery_status"),
+            event.get("delivery_error"),
+            delivered_at_dt,
+            created_at_dt,
+        )
+
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, data)
+            conn.commit()
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar notificacao: {exc}")
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def get_notifications(self, limit=100):
+        sql = """
+        SELECT
+            id, event_key, event_type, category, priority, severity, symbol, ticket, side, rule_id, message,
+            price, sl, tp, metadata_json, status, suppression_reason, aggregated_count,
+            delivery_channel, delivery_status, delivery_error, delivered_at, created_at
+        FROM notification_events
+        ORDER BY id DESC
+        LIMIT %s
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(sql, (int(limit),))
+            rows = cursor.fetchall()
+            for row in rows:
+                raw = row.get("metadata_json")
+                if isinstance(raw, str):
+                    try:
+                        row["metadata"] = json.loads(raw)
+                    except Exception:
+                        row["metadata"] = {}
+                elif isinstance(raw, dict):
+                    row["metadata"] = raw
+                else:
+                    row["metadata"] = {}
+            return rows
+        except Exception as exc:
+            self.logger.error(f"Erro ao carregar notificacoes: {exc}")
+            return []
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def get_notification_metrics(self):
+        sql = """
+        SELECT
+            SUM(CASE WHEN status IN ('emitted', 'delivery_failed') THEN 1 ELSE 0 END) AS emitted,
+            SUM(CASE WHEN status = 'suppressed' THEN 1 ELSE 0 END) AS suppressed,
+            SUM(CASE WHEN status = 'delivery_failed' THEN 1 ELSE 0 END) AS delivery_failed
+        FROM notification_events
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(sql)
+            row = cursor.fetchone() or {}
+            return {
+                "emitted": int(row.get("emitted") or 0),
+                "suppressed": int(row.get("suppressed") or 0),
+                "delivery_failed": int(row.get("delivery_failed") or 0),
+            }
+        except Exception as exc:
+            self.logger.error(f"Erro ao carregar metricas de notificacao: {exc}")
+            return {"emitted": 0, "suppressed": 0, "delivery_failed": 0}
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
 
     def save_trade_open(self, ticket, symbol, magic, trade_type, timeframe, strategy, price, sl, tp, indicators, settings_id=None):
         """Registra abertura de nova posicao vinculada a um snapshot de configuracao."""
