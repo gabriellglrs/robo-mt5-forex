@@ -264,11 +264,6 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
         </div>
         <div className="text-right">
           <div className="flex items-center gap-2 justify-end mb-1">
-             <Link href={`/monitor/${asset.symbol}`}>
-               <button className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-[#00FFAA] bg-[#00FFAA]/10 border border-[#00FFAA]/30 px-2 py-0.5 rounded-sm hover:bg-[#00FFAA]/20 transition-all">
-                  <Eye className="w-3 h-3" /> Terminal
-               </button>
-             </Link>
              <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest ml-2">Price</span>
              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
           </div>
@@ -400,6 +395,22 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
           )}
         </div>
       </div>
+
+      <Link
+        href={`/monitor/${asset.symbol}`}
+        className="w-full group/cta mt-1"
+        aria-label={`Abrir painel completo de ${asset.symbol}`}
+      >
+        <div className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-primary/25 bg-primary/10 text-primary hover:bg-primary/15 hover:border-primary/45 transition-all duration-200">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4" />
+            <span className="text-[11px] font-black uppercase tracking-[0.14em]">
+              Abrir Painel do Ativo
+            </span>
+          </div>
+          <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover/cta:translate-x-0.5" />
+        </div>
+      </Link>
     </div>
   );
 }

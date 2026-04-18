@@ -39,6 +39,15 @@ body {
 }
 
 /* Neon Glows */
+@keyframes scanline {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(300px); }
+}
+
+.animate-scanline {
+  animation: scanline 4s linear infinite;
+}
+
 .glow-primary {
   box-shadow: 0 0 15px rgba(0, 255, 170, 0.3);
 }
