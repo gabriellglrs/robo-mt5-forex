@@ -101,7 +101,8 @@ def test_fim_015_reversal_blocked(signal_detector):
     signal_detector._detect_trend = MagicMock(return_value=("BUY", 0.5))
     signal_detector._build_ab_projection = MagicMock(return_value={
         "point_a": 1.1010, "point_b": 1.1000, "channel_size": 0.0010,
-        "projection_50": 1.0995, "projection_80": 1.0992, "projection_85": 1.09915, "projection_100": 1.0990
+        "projection_50": 1.0995, "projection_80": 1.0992, "projection_85": 1.09915,
+        "projection_90": 1.0991, "projection_95": 1.09905, "projection_100": 1.0990
     })
     res = signal_detector.evaluate_signal_details(1.0995, [])
     assert res["rule_trace"]["FIM-015"] == "bloqueado"
@@ -114,3 +115,98 @@ def test_fim_016_structural_fail(signal_detector):
     signal_detector._check_structural_trend = MagicMock(return_value=False)
     res = signal_detector.evaluate_signal_details(1.1015, [])
     assert res["rule_trace"]["FIM-016"] == "bloqueado"
+
+def test_ab_projection_freezes_while_waiting_breakout(signal_detector):
+    signal_detector.settings["require_channel_break"] = True
+    signal_detector.settings["breakout_buffer_points"] = 10
+    signal_detector.settings["require_pullback_retest"] = False
+    signal_detector.settings["require_sr_touch"] = False
+    signal_detector.settings["require_grouping"] = False
+    signal_detector.settings["sr_tolerance_points"] = 500
+
+    trend_df_initial = pd.DataFrame({
+        "close": np.linspace(1.1000, 1.1010, 100),
+        "high": [1.1010] * 100,
+        "low": [1.1000] * 100,
+        "open": [1.1005] * 100,
+    })
+    trend_df_drift = pd.DataFrame({
+        "close": np.linspace(1.1000, 1.1010, 100),
+        "high": [1.1010] * 100,
+        "low": [1.1000] * 99 + [1.0950],
+        "open": [1.1005] * 100,
+    })
+    entry_df = pd.DataFrame({
+        "high": [1.1010] * 100,
+        "low": [1.1000] * 100,
+        "close": [1.1006] * 100,
+        "open": [1.1004] * 100,
+    })
+
+    call = {"n": 0}
+
+    def mock_load_rates(timeframe, count):
+        stage = min(call["n"] // 2, 1)
+        call["n"] += 1
+        if timeframe == "H1":
+            return [trend_df_initial, trend_df_drift][stage]
+        return entry_df
+
+    signal_detector._load_rates = MagicMock(side_effect=mock_load_rates)
+    signal_detector._detect_trend = MagicMock(return_value=("BUY", 0.5))
+
+    first = signal_detector.evaluate_signal_details(1.1005, [])
+    second = signal_detector.evaluate_signal_details(1.1005, [])
+
+    assert first["reason"] == "aguardando_rompimento_canal"
+    assert second["reason"] == "aguardando_rompimento_canal"
+    assert first["point_b"] == pytest.approx(1.1000)
+    assert second["point_b"] == pytest.approx(first["point_b"])
+
+def test_ab_projection_unfreezes_after_setup_ready(signal_detector):
+    signal_detector.settings["require_channel_break"] = True
+    signal_detector.settings["breakout_buffer_points"] = 10
+    signal_detector.settings["require_pullback_retest"] = False
+    signal_detector.settings["require_sr_touch"] = False
+    signal_detector.settings["require_grouping"] = False
+    signal_detector.settings["sr_tolerance_points"] = 500
+
+    trend_df_initial = pd.DataFrame({
+        "close": np.linspace(1.1000, 1.1010, 100),
+        "high": [1.1010] * 100,
+        "low": [1.1000] * 100,
+        "open": [1.1005] * 100,
+    })
+    trend_df_drift = pd.DataFrame({
+        "close": np.linspace(1.1000, 1.1010, 100),
+        "high": [1.1010] * 100,
+        "low": [1.1000] * 99 + [1.0950],
+        "open": [1.1005] * 100,
+    })
+    entry_df = pd.DataFrame({
+        "high": [1.1010] * 100,
+        "low": [1.1000] * 100,
+        "close": [1.1006] * 100,
+        "open": [1.1004] * 100,
+    })
+
+    call = {"n": 0}
+
+    def mock_load_rates(timeframe, count):
+        stage = min(call["n"] // 2, 2)
+        call["n"] += 1
+        if timeframe == "H1":
+            return [trend_df_initial, trend_df_drift, trend_df_drift][stage]
+        return entry_df
+
+    signal_detector._load_rates = MagicMock(side_effect=mock_load_rates)
+    signal_detector._detect_trend = MagicMock(return_value=("BUY", 0.5))
+
+    waiting = signal_detector.evaluate_signal_details(1.1005, [])
+    setup_ready = signal_detector.evaluate_signal_details(1.1007, [])
+    post_reset = signal_detector.evaluate_signal_details(1.1005, [])
+
+    assert waiting["reason"] == "aguardando_rompimento_canal"
+    assert setup_ready["reason"] == "setup_pronto"
+    assert post_reset["reason"] == "aguardando_rompimento_canal"
+    assert post_reset["point_b"] == pytest.approx(1.0950)
