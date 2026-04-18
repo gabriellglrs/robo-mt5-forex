@@ -187,13 +187,21 @@ export default function AssetMonitorPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto p-4 lg:p-6 pb-20">
-      {/* Premium Header */}
+      {/* Tactical Stats (Moved to Top) */}
+      <TacticalStats 
+        price={assetRuntime?.price}
+        pnl={assetRuntime?.current_pnl}
+        phase={phaseLabel(assetRuntime?.status_phase)}
+        isRunning={isRunning}
+      />
+
+      {/* Premium Header (Moved to Bottom of Stats Section) */}
       <motion.div 
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 glass p-4 px-6 rounded-[24px] border border-white/5"
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 min-w-[200px]">
           <Link href="/monitor">
             <button className="w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors group">
               <ArrowLeft className="w-4 h-4 text-gray-400 group-hover:text-white" />
@@ -208,12 +216,37 @@ export default function AssetMonitorPage() {
             </div>
             <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
               <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              Sistema em Tempo Real Fimathe
+              Sincronizado
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+        {/* Dynamic Trend Indicator (CENTER) */}
+        <div className="flex-1 flex justify-center py-2 lg:py-0">
+          <div className={`
+             px-6 py-2 rounded-2xl border flex items-center gap-3 transition-all duration-500
+             ${assetRuntime?.trend_direction === 'BUY' ? 'bg-primary/10 border-primary/30 text-primary shadow-[0_0_20px_rgba(0,255,170,0.1)]' : 
+               assetRuntime?.trend_direction === 'SELL' ? 'bg-red-500/10 border-red-500/30 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]' : 
+               'bg-white/5 border-white/10 text-white/50'}
+          `}>
+            <Activity className="w-4 h-4" />
+            <div className="flex flex-col items-center">
+              <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-50 leading-none mb-1">Tendência Atual</span>
+              <span className="text-sm font-black uppercase tracking-widest leading-none flex items-center gap-2">
+                {assetRuntime?.trend_direction === 'BUY' ? 'Tendência de Alta' : 
+                 assetRuntime?.trend_direction === 'SELL' ? 'Tendência de Baixa' : 'Lateralização'}
+                
+                {assetRuntime?.trend_timeframe && (
+                   <span className="text-[9px] font-mono font-black bg-black/20 px-1.5 py-0.5 rounded border border-white/10 opacity-70">
+                      {assetRuntime.trend_timeframe}
+                   </span>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 min-w-[200px] justify-end">
           {['M1', 'M5', 'M15', 'H1'].map((timeframe) => (
             <button
               key={timeframe}
@@ -227,14 +260,6 @@ export default function AssetMonitorPage() {
           ))}
         </div>
       </motion.div>
-
-      {/* Tactical Stats */}
-      <TacticalStats 
-        price={assetRuntime?.price}
-        pnl={assetRuntime?.current_pnl}
-        phase={phaseLabel(assetRuntime?.status_phase)}
-        isRunning={isRunning}
-      />
 
       {/* Main Command Center Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
