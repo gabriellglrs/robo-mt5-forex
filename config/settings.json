@@ -7,7 +7,8 @@
         ],
         "history_years": 2,
         "wick_sensitivity": 0.3,
-        "trend_candles": 300
+        "trend_candles": 60,
+        "ab_lookback_candles": 5
     },
     "signal_logic": {
         "trend_timeframe": "M15",
@@ -15,13 +16,13 @@
         "breakout_buffer_points": 10,
         "trend_min_slope_points": 0.2,
         "sr_tolerance_points": 35,
-        "require_grouping": false,
+        "require_grouping": true,
         "require_channel_break": true,
-        "require_sr_touch": false,
-        "max_spread_points": 0,
-        "require_pullback_retest": false,
-        "strict_reversal_logic": false,
-        "require_structural_trend": false,
+        "require_sr_touch": true,
+        "max_spread_points": 30,
+        "require_pullback_retest": true,
+        "strict_reversal_logic": true,
+        "require_structural_trend": true,
         "triangle_m1_candles": 5,
         "target_level_mode": "80",
         "trading_type": "scalper",
@@ -29,7 +30,7 @@
         "fimathe_cycle_top_level": "100"
     },
     "risk_management": {
-        "risk_percent": 1,
+        "risk_percent": 1.0,
         "max_open_positions": 1,
         "magic_number": 202404,
         "symbol_cooldown_seconds": 300,

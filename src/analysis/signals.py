@@ -60,7 +60,7 @@ class SignalDetector:
 
     def _build_ab_projection(self, trend_df, trend_direction):
         # Permite ao usuário espremer a caixa até 5 velas se desejar canais micro
-        lookback = max(5, int(self.settings.get("ab_lookback_candles", 80)))
+        lookback = max(5, min(300, int(self.settings.get("ab_lookback_candles", 80))))
         window = trend_df.tail(lookback)
 
         point_a = float(window["high"].max())
@@ -163,8 +163,8 @@ class SignalDetector:
         """Retorna diagnostico completo do setup Fimathe."""
         trend_tf = self.settings.get("trend_timeframe", "H1")
         entry_tf = self.settings.get("entry_timeframe", "M15")
-        trend_candles = max(50, int(self.settings.get("trend_candles", 200)))
-        entry_lookback = max(20, int(self.settings.get("entry_lookback_candles", 50)))
+        trend_candles = max(5, min(300, int(self.settings.get("trend_candles", 200))))
+        entry_lookback = max(5, min(300, int(self.settings.get("entry_lookback_candles", 50))))
 
         # Novas Configurações
         strict_reversal = bool(self.settings.get("strict_reversal_logic", True))
@@ -206,6 +206,8 @@ class SignalDetector:
                 "rule_trace": decision["rule_trace"],
                 **resolve_rule_meta(decision["reason"]),
             }
+
+        trend_direction, slope_points = self._detect_trend(trend_df.tail(trend_candles))
 
         # CÁLCULO DE PROJEÇÃO (Sempre executado para garantir que a UI tenha os níveis atualizados)
         # Se a tendência for lateral, usamos 'BUY' apenas como base técnica para o lookback, 

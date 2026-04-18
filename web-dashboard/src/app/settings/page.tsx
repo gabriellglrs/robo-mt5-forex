@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from 'react';
 import { 
@@ -216,6 +216,13 @@ const TRADING_PROFILES: Record<string, { name: string, trend: string, entry: str
   swing_trader: { name: 'Swing Trader (D1/H4)', trend: 'D1', entry: 'H4', color: 'text-purple-400' },
 };
 
+const CHANNEL_PRESETS: Record<string, { label: string; ab: number; trend: number }> = {
+  micro: { label: 'Micro', ab: 7, trend: 40 },
+  intraday: { label: 'Intraday', ab: 40, trend: 120 },
+  trend: { label: 'Trend', ab: 150, trend: 200 },
+  macro: { label: 'Macro', ab: 200, trend: 300 },
+};
+
 const SETTINGS_HELP = {
   // Analysis
   history_years: { title: "Lookback Histórico", content: "Define quantos anos de dados o robô analisa. Mais dados ajudam a identificar suportes históricos, mas aumentam o processamento." },
@@ -326,7 +333,15 @@ export default function SettingsPage() {
         body: JSON.stringify({ settings }),
       });
       
-      if (!res.ok) throw new Error('Falha ao salvar');
+      const savePayload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const apiErrors = Array.isArray(savePayload?.detail?.errors) ? savePayload.detail.errors.join(' | ') : '';
+        const apiMessage = savePayload?.detail?.message || savePayload?.detail || 'Falha ao salvar';
+        throw new Error(`${apiMessage}${apiErrors ? `: ${apiErrors}` : ''}`);
+      }
+      if (savePayload?.settings) {
+        setSettings(savePayload.settings);
+      }
 
       // 2. Comanda a Parada do Robô
       setNotification({ message: '🛑 REINICIANDO MOTOR: Parando processo atual...', type: 'success' });
@@ -352,8 +367,8 @@ export default function SettingsPage() {
         setNotification({ message: '⚠️ AVISO: Configurações salvas, mas o robô não iniciou sozinho.', type: 'error' });
       }
 
-    } catch (e) { 
-      setNotification({ message: 'ERRO CRÍTICO: Não foi possível completar a sincronização.', type: 'error' });
+    } catch (e: any) {
+      setNotification({ message: `ERRO CRITICO: ${e?.message || 'Nao foi possivel completar a sincronizacao.'}`, type: 'error' });
     } finally {
       setSaving(false);
       setTimeout(() => setNotification(null), 5000);
@@ -408,13 +423,16 @@ export default function SettingsPage() {
       if (mode === 'standard') {
         risk.fimathe_be_trigger_percent = 50;
         signal.fimathe_cycle_top_level = '80';
+        signal.target_level_mode = '80';
       } else if (mode === 'conservative') {
         risk.fimathe_be_trigger_percent = 50;
         signal.fimathe_cycle_top_level = '80';
+        signal.target_level_mode = '80';
       } else if (mode === 'infinity') {
         risk.fimathe_be_trigger_percent = 50;
         risk.fimathe_trail_step_percent = 100;
         signal.fimathe_cycle_top_level = '100';
+        signal.target_level_mode = '100';
       }
       
       return { ...prev, risk_management: risk, signal_logic: signal };
@@ -425,6 +443,20 @@ export default function SettingsPage() {
       type: 'success' 
     });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const applyChannelPreset = (presetKey: string) => {
+    const preset = CHANNEL_PRESETS[presetKey];
+    if (!preset) return;
+
+    setSettings((prev: any) => ({
+      ...prev,
+      analysis: {
+        ...prev.analysis,
+        ab_lookback_candles: preset.ab,
+        trend_candles: preset.trend,
+      }
+    }));
   };
 
   const handleResetData = async () => {
@@ -446,8 +478,8 @@ export default function SettingsPage() {
       } else {
         setNotification({ message: 'ERRO NO RESET: Não foi possível limpar os dados.', type: 'error' });
       }
-    } catch (e) {
-      setNotification({ message: 'ERRO CRÍTICO: Falha na comunicação com o servidor.', type: 'error' });
+    } catch (e: any) {
+      setNotification({ message: `ERRO CRITICO: ${e?.message || 'Nao foi possivel completar a sincronizacao.'}`, type: 'error' });
     }
     setResetting(false);
   };
@@ -679,16 +711,49 @@ export default function SettingsPage() {
                     </div>
                   </div>
                  
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-3">
+                   <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest">Presets de Janela (Canal + Tendencia)</label>
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                     {Object.entries(CHANNEL_PRESETS).map(([key, preset]) => (
+                       <button
+                         key={key}
+                         onClick={() => applyChannelPreset(key)}
+                         className="py-2 rounded-xl text-[10px] font-black bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+                       >
+                         {preset.label} ({preset.ab}/{preset.trend})
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
                         Largura do Canal (Velas)
                         <InfoTooltip title="Lookback do Canal Fimathe" content="Define a quantidade de velas no Timeframe de Tendência para pescar a Máxima (A) e Mínima (B). Diminua para canais mais justos." />
                       </label>
                        <input 
-                          type="number" 
+                          type="number"
+                          min={5}
+                          max={300}
                           value={settings.analysis?.ab_lookback_candles || 80}
-                          onChange={(e) => updateNested('analysis', 'ab_lookback_candles', parseInt(e.target.value))}
+                          onChange={(e) => updateNested('analysis', 'ab_lookback_candles', parseInt(e.target.value || '80', 10))}
+                          title="Faixa permitida: 5 a 300"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-secondary transition-all"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
+                        Confirmação de Tendência (Velas)
+                        <InfoTooltip title={SETTINGS_HELP.trend_candles.title} content={SETTINGS_HELP.trend_candles.content} />
+                      </label>
+                       <input 
+                          type="number"
+                          min={5}
+                          max={300}
+                          value={settings.analysis?.trend_candles || 200}
+                          onChange={(e) => updateNested('analysis', 'trend_candles', parseInt(e.target.value || '200', 10))}
+                          title="Faixa permitida: 5 a 300"
                           className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-secondary transition-all"
                        />
                     </div>
@@ -1029,7 +1094,14 @@ export default function SettingsPage() {
                                {['50', '80', '85', '90', '95', '100'].map((lvl) => (
                                  <button
                                    key={lvl}
-                                   onClick={() => updateNested('signal_logic', 'fimathe_cycle_top_level', lvl)}
+                                   onClick={() => setSettings((prev: any) => ({
+                                     ...prev,
+                                     signal_logic: {
+                                       ...prev.signal_logic,
+                                       fimathe_cycle_top_level: lvl,
+                                       target_level_mode: lvl,
+                                     },
+                                   }))}
                                    className={`py-2.5 rounded-2xl text-[10px] font-black transition-all duration-300 ${
                                      (settings.signal_logic?.fimathe_cycle_top_level || '80') === lvl
                                        ? 'bg-primary text-black shadow-[0_0_15px_rgba(34,211,238,0.3)]'
@@ -1375,3 +1447,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+

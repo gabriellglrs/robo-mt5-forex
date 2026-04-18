@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import sys
 
@@ -25,6 +25,7 @@ import bcrypt
 from pydantic import BaseModel
 
 from src.core.database import DatabaseManager
+from src.core.settings_schema import SettingsValidationError, validate_and_normalize_settings
 
 # --- INICIALIZACAO MT5 (GLOBAL PARA PERFORMANCE) ---
 if not mt5.initialize():
@@ -44,13 +45,13 @@ SECRET_KEY = "robo-mt5-v2-super-secret-key" # Mudar em producao
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 horas
 
-# Usuário único para esta fase
+# UsuÃ¡rio Ãºnico para esta fase
 FAKE_USER = {
     "username": "admin",
     "password_hash": "$2b$12$VotrRxChzL6yao3KBxJuYOwqlQxZzHwO1uNreMHJzBXawrTwmRZ06" # admin123
 }
 
-# bcrypt usado diretamente (passlib incompatível com bcrypt 5.x no Python 3.14)
+# bcrypt usado diretamente (passlib incompatÃ­vel com bcrypt 5.x no Python 3.14)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def verify_password(plain_password, hashed_password):
@@ -227,19 +228,30 @@ def get_settings(user: str = Depends(get_current_user)):
 
 @app.post("/settings")
 def update_settings(update: SettingsUpdate, user: str = Depends(get_current_user)):
+    try:
+        normalized_settings = validate_and_normalize_settings(update.settings)
+    except SettingsValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Configuracao invalida. Revise os campos informados.",
+                "errors": exc.errors,
+            },
+        )
+
     # 1. Salva no arquivo JSON (Cache Local/Resiliencia)
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(update.settings, f, indent=4, ensure_ascii=False)
+        json.dump(normalized_settings, f, indent=4, ensure_ascii=False)
     
     # 2. Salva no Banco de Dados (Auditoria Historica)
     try:
         db = DatabaseManager()
-        db.save_settings_snapshot(update.settings)
+        db.save_settings_snapshot(normalized_settings)
     except Exception as e:
         print(f"Erro ao gravar snapshot de settings no DB: {e}")
         # Nao lancamos erro aqui para nao travar o save do arquivo se o DB falhar
         
-    return {"message": "Configurações atualizadas e snapshot de auditoria criado."}
+    return {"message": "Configuracoes atualizadas e snapshot de auditoria criado.", "settings": normalized_settings}
 
 @app.get("/runtime")
 def get_runtime(user: str = Depends(get_current_user)):
@@ -266,7 +278,7 @@ def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current
     rates = mt5.copy_rates_from_pos(symbol.upper(), mt5_tf, 0, 500)
     
     if rates is None or len(rates) == 0:
-        raise HTTPException(status_code=404, detail=f"Dados do ativo {symbol} não acessíveis. Certifique-se que está na observação do mercado.")
+        raise HTTPException(status_code=404, detail=f"Dados do ativo {symbol} nÃ£o acessÃ­veis. Certifique-se que estÃ¡ na observaÃ§Ã£o do mercado.")
         
     formatted_data = []
     for rate in rates:
@@ -282,7 +294,7 @@ def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current
 
 @app.get("/metrics")
 def get_metrics(user: str = Depends(get_current_user)):
-    """Versão simplificada de métricas para o monitor."""
+    """VersÃ£o simplificada de mÃ©tricas para o monitor."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -313,7 +325,7 @@ def get_metrics(user: str = Depends(get_current_user)):
 
 @app.get("/api/performance")
 def get_performance_stats(user: str = Depends(get_current_user)):
-    """Estatísticas avançadas para o Dashboard de BI."""
+    """EstatÃ­sticas avanÃ§adas para o Dashboard de BI."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -343,7 +355,7 @@ def get_performance_stats(user: str = Depends(get_current_user)):
         """)
         by_asset = cursor.fetchall()
         
-        # 3. Histórico de Trades para Curva de Equity (ordenado por saída)
+        # 3. HistÃ³rico de Trades para Curva de Equity (ordenado por saÃ­da)
         cursor.execute("""
             SELECT ticket, symbol, pnl, exit_time 
             FROM trades 
@@ -354,7 +366,7 @@ def get_performance_stats(user: str = Depends(get_current_user)):
         
         conn.close()
         
-        # Processamento de métricas
+        # Processamento de mÃ©tricas
         total_trades = stats["total_trades"] or 0
         gross_profit = float(stats["gross_profit"] or 0)
         gross_loss = abs(float(stats["gross_loss"] or 0))
@@ -363,7 +375,7 @@ def get_performance_stats(user: str = Depends(get_current_user)):
         win_rate = (stats["win_count"] / total_trades * 100) if total_trades > 0 else 0
         payoff = (float(stats["avg_win"] or 0) / abs(float(stats["avg_loss"] or 1))) if stats["avg_loss"] else 0
         
-        # Cálculo básico de Max Drawdown (Realizado)
+        # CÃ¡lculo bÃ¡sico de Max Drawdown (Realizado)
         cumulative_pnl = 0.0
         peak = 0.0
         max_dd = 0.0
@@ -427,16 +439,16 @@ def clear_logs(user: str = Depends(get_current_user)):
 
 @app.post("/maintenance/reset-data")
 def reset_data(user: str = Depends(get_current_user)):
-    """Limpa todo o histórico de trades e eventos do dashboard."""
+    """Limpa todo o histÃ³rico de trades e eventos do dashboard."""
     try:
-        # 1. Verifica se o robô está rodando (opcional, mas recomendado)
+        # 1. Verifica se o robÃ´ estÃ¡ rodando (opcional, mas recomendado)
         # Por simplicidade, vamos permitir, mas logar
         print(f"[{datetime.now()}] RESET DE DADOS solicitado por {user}")
 
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 2. Limpa histórico de trades
+        # 2. Limpa histÃ³rico de trades
         cursor.execute("DELETE FROM trades")
         
         # 3. Limpa logs do sistema
@@ -452,14 +464,14 @@ def reset_data(user: str = Depends(get_current_user)):
                     runtime = json.load(f)
                 
                 runtime["recent_events"] = []
-                # Também poderíamos zerar estatísticas globais aqui se existirem
+                # TambÃ©m poderÃ­amos zerar estatÃ­sticas globais aqui se existirem
                 
                 with open(RUNTIME_FILE, "w", encoding="utf-8") as f:
                     json.dump(runtime, f, indent=2, ensure_ascii=False)
             except Exception as e:
                 print(f"Erro ao limpar runtime events: {e}")
 
-        return {"message": "Dados de histórico e eventos limpos com sucesso."}
+        return {"message": "Dados de histÃ³rico e eventos limpos com sucesso."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -517,3 +529,4 @@ threading.Thread(target=background_log_cleaner, daemon=True).start()
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
