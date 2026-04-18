@@ -13,6 +13,7 @@ from core.database import DatabaseManager
 from execution.fimathe_cycle import evaluate_fimathe_cycle_event
 from execution.orders import OrderEngine
 from execution.risk import RiskManager
+from notifications import NotificationService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -148,6 +149,7 @@ def build_symbol_engines(symbols, settings, db_manager):
             "risk_manager": risk_manager,
             "order_engine": order_engine,
             "levels": levels,
+            "last_settings_hash": None,
         }
 
         logger.info(f"{symbol}: monitoramento iniciado com {len(levels)} niveis ativos.")
@@ -257,6 +259,16 @@ def append_runtime_event(runtime_snapshot, symbol, message, level="INFO"):
     )
     if len(events) > 80:
         del events[:-80]
+
+
+def emit_notification_safely(notification_service, payload):
+    if notification_service is None:
+        return None
+    try:
+        return notification_service.emit(payload)
+    except Exception as exc:
+        logger.error(f"Falha ao processar notificacao: {exc}")
+        return None
 
 
 def build_runtime_symbol_snapshot(
@@ -641,6 +653,9 @@ def main():
 
     db_manager = DatabaseManager()
     db_manager.log_event("INFO", "Main", f"Robo iniciado com sucesso. Ativos: {', '.join(symbols)}")
+    notification_cfg = settings.get("notifications", {})
+    notification_cfg_hash = json.dumps(notification_cfg, sort_keys=True, ensure_ascii=False)
+    notification_service = NotificationService(db_manager=db_manager, config=notification_cfg)
     runtime_snapshot = {
         "status": "starting",
         "strategy": STRATEGY_NAME,
@@ -648,6 +663,7 @@ def main():
         "updated_at": datetime.now().isoformat(timespec="seconds"),
         "symbols": {},
         "recent_events": [],
+        "notifications": notification_service.snapshot(),
     }
     write_runtime_snapshot(runtime_snapshot)
 
@@ -674,6 +690,8 @@ def main():
         runtime_snapshot["status"] = "running"
         runtime_snapshot["symbols"] = {}
         runtime_snapshot["recent_events"] = []
+        runtime_snapshot["notifications"] = notification_service.snapshot()
+        mt5_connection_was_up = True
         
         loop_counter = 0
         while True:
@@ -681,6 +699,14 @@ def main():
             new_settings = load_settings()
             if new_settings:
                 settings = new_settings
+                current_notification_cfg = settings.get("notifications", {})
+                current_cfg_hash = json.dumps(current_notification_cfg, sort_keys=True, ensure_ascii=False)
+                if current_cfg_hash != notification_cfg_hash:
+                    notification_service = NotificationService(
+                        db_manager=db_manager,
+                        config=current_notification_cfg,
+                    )
+                    notification_cfg_hash = current_cfg_hash
                 
                 # Verificação dinâmica de símbolos (Ativos Monitorados)
                 current_config_symbols = parse_symbols(settings)
@@ -729,6 +755,33 @@ def main():
             analysis_flow_interval_seconds = max(5, int(settings.get("ui_settings", {}).get("analysis_flow_interval_seconds", 15)))
 
             is_running = settings.get("running_state", False)
+            mt5_connected_now = conn.check_connection()
+            if mt5_connected_now != mt5_connection_was_up:
+                if mt5_connected_now:
+                    append_runtime_event(runtime_snapshot, "SYSTEM", "Conexao MT5 restabelecida.", "INFO")
+                    emit_notification_safely(
+                        notification_service,
+                        {
+                            "event_type": "MT5_RECONNECTED",
+                            "category": "health",
+                            "priority": "P1",
+                            "severity": "critical",
+                            "message": "Conexao com MT5 restabelecida.",
+                        },
+                    )
+                else:
+                    append_runtime_event(runtime_snapshot, "SYSTEM", "Conexao MT5 perdida.", "ERROR")
+                    emit_notification_safely(
+                        notification_service,
+                        {
+                            "event_type": "MT5_DISCONNECTED",
+                            "category": "health",
+                            "priority": "P1",
+                            "severity": "critical",
+                            "message": "Conexao com MT5 perdida.",
+                        },
+                    )
+            mt5_connection_was_up = mt5_connected_now
 
             if loop_counter % 60 == 0:
                 status_msg = "Robo operando normalmente." if is_running else "Robo em PAUSE (Aguardando Start na UI)."
@@ -783,22 +836,29 @@ def main():
                         cycle_state_by_ticket=cycle_state_by_ticket,
                     )
 
-                    # Atualiza configurações dinâmicas no signal_detector e risk_manager
-                    signal_cfg_current = normalize_signal_logic_cfg(settings.get("signal_logic", {}))
-                    analysis_cfg_current = settings.get("analysis", {})
-                    
-                    # Ponte Crítica: Garante que o Lookback configurado na UI (em analysis) chegue ao motor
-                    signal_cfg_current["trend_candles"] = analysis_cfg_current.get("trend_candles", 200)
-                    signal_cfg_current["ab_lookback_candles"] = analysis_cfg_current.get("ab_lookback_candles", 80)
-                    
-                    engine["signal_detector"].settings = signal_cfg_current
-                    
-                    risk_cfg_current = normalize_risk_cfg(settings.get("risk_management", {}))
-                    # Inject strategy flags for risk manager
-                    risk_cfg_current["fimathe_target_level"] = signal_cfg_current.get("fimathe_cycle_top_level", "80")
-                    
-                    engine["risk_manager"].config = risk_cfg_current
-                    engine["risk_manager"].settings = risk_cfg_current
+                    # 1. SINCRONIZAÇÃO ATÔMICA DE CONFIGURAÇÕES (Hot-Reload)
+                    current_settings_hash = json.dumps(settings, sort_keys=True)
+                    if engine.get("last_settings_hash") != current_settings_hash:
+                        signal_cfg_current = normalize_signal_logic_cfg(settings.get("signal_logic", {}))
+                        analysis_cfg_current = settings.get("analysis", {})
+                        risk_cfg_current = normalize_risk_cfg(settings.get("risk_management", {}))
+
+                        # Injeta parâmetros de análise no motor de sinais
+                        signal_cfg_current["trend_candles"] = analysis_cfg_current.get("trend_candles", 200)
+                        signal_cfg_current["ab_lookback_candles"] = analysis_cfg_current.get("ab_lookback_candles", 80)
+                        
+                        # Atualiza motores
+                        engine["signal_detector"].settings = signal_cfg_current
+                        
+                        risk_cfg_current["fimathe_target_level"] = signal_cfg_current.get("fimathe_cycle_top_level", "80")
+                        engine["risk_manager"].config = risk_cfg_current
+                        engine["risk_manager"].settings = risk_cfg_current
+                        
+                        # Atualiza LevelDetector se necessário
+                        engine["detector"].wick_sensitivity = analysis_cfg_current.get("wick_sensitivity", 0.3)
+                        
+                        engine["last_settings_hash"] = current_settings_hash
+                        logger.info(f"[{symbol}] Configuracoes atualizadas via dashboard (Hot-Reload).")
 
                     current_price = tick.bid
                     signal_point = getattr(engine["signal_detector"], "point", 0.00001) or 0.00001
@@ -820,7 +880,22 @@ def main():
                     for t in db_trades:
                         if t["ticket"] not in mt5_tickets:
                             logger.warning(f"[{symbol}] Reconciliacao em tempo real: Ticket #{t['ticket']} no banco mas nao no MT5. Sincronizando...")
-                            order_engine.sync_position_closure(t["ticket"])
+                            close_details = order_engine.sync_position_closure(t["ticket"])
+                            if close_details:
+                                emit_notification_safely(
+                                    notification_service,
+                                    {
+                                        "event_type": "ORDER_CLOSED",
+                                        "category": "execution",
+                                        "priority": "P1",
+                                        "severity": "high",
+                                        "message": f"{symbol} ticket {t['ticket']} encerrado durante reconciliacao.",
+                                        "symbol": symbol,
+                                        "ticket": t["ticket"],
+                                        "price": close_details.get("exit_price"),
+                                        "metadata": {"pnl": close_details.get("pnl")},
+                                    },
+                                )
                     
                     # Atualiza tickets ativos para o cálculo de exposição
                     active_tickets = mt5_tickets | {t["ticket"] for t in db_manager.get_open_trades(symbol)}
@@ -842,6 +917,20 @@ def main():
                                 symbol,
                                 f"Trade #{closed_ticket} encerrado. Resultado final: {pnl_str}",
                                 "TRADE_CLOSE"
+                            )
+                            emit_notification_safely(
+                                notification_service,
+                                {
+                                    "event_type": "ORDER_CLOSED",
+                                    "category": "execution",
+                                    "priority": "P1",
+                                    "severity": "high",
+                                    "message": f"{symbol} ticket {closed_ticket} encerrado ({pnl_str}).",
+                                    "symbol": symbol,
+                                    "ticket": closed_ticket,
+                                    "price": close_details.get("exit_price"),
+                                    "metadata": {"pnl": pnl_val},
+                                },
                             )
                     active_tickets_per_symbol[symbol] = current_tickets
 
@@ -892,6 +981,24 @@ def main():
                             f"Ticket {ticket}: {action_note} ({action_rule})",
                             "RISK",
                         )
+                        action_event = action.get("event")
+                        canonical_event = "TRAILING_SL_MOVED"
+                        if action_event == "perdeu_50":
+                            canonical_event = "BREAK_EVEN_MOVED"
+                        emit_notification_safely(
+                            notification_service,
+                            {
+                                "event_type": canonical_event,
+                                "category": "risk",
+                                "priority": "P2",
+                                "severity": "high",
+                                "message": f"{symbol} ticket {ticket}: {action_note}",
+                                "symbol": symbol,
+                                "ticket": ticket,
+                                "rule_id": action_rule,
+                                "price": current_price,
+                            },
+                        )
 
                     now_ts = time.time()
                     
@@ -926,6 +1033,19 @@ def main():
                     if not signal:
                         continue
                     if open_count >= max_pos:
+                        emit_notification_safely(
+                            notification_service,
+                            {
+                                "event_type": "EXPOSURE_LIMIT_REACHED",
+                                "category": "risk",
+                                "priority": "P2",
+                                "severity": "high",
+                                "message": f"{symbol}: limite de exposicao atingido (FIM-012).",
+                                "symbol": symbol,
+                                "rule_id": "FIM-012",
+                                "price": current_price,
+                            },
+                        )
                         continue
 
                     now_ts = time.time()
@@ -971,6 +1091,44 @@ def main():
                             f"Ordem {signal} executada com sucesso (ticket {getattr(result, 'order', '-')}).",
                             "ENTRY",
                         )
+                        emit_notification_safely(
+                            notification_service,
+                            {
+                                "event_type": "ORDER_OPENED",
+                                "category": "execution",
+                                "priority": "P1",
+                                "severity": "high",
+                                "message": f"{symbol} ordem {signal} aberta.",
+                                "symbol": symbol,
+                                "ticket": getattr(result, "order", None),
+                                "side": signal,
+                                "rule_id": details.get("rule_id"),
+                                "price": current_price,
+                                "sl": sl,
+                                "tp": tp,
+                            },
+                        )
+                    else:
+                        emit_notification_safely(
+                            notification_service,
+                            {
+                                "event_type": "ORDER_REJECTED",
+                                "category": "execution",
+                                "priority": "P1",
+                                "severity": "critical",
+                                "message": f"{symbol} ordem {signal} rejeitada pela corretora.",
+                                "symbol": symbol,
+                                "side": signal,
+                                "rule_id": details.get("rule_id"),
+                                "price": current_price,
+                                "sl": sl,
+                                "tp": tp,
+                                "metadata": {
+                                    "retcode": getattr(result, "retcode", None) if result else None,
+                                    "comment": getattr(result, "comment", None) if result else "no_result",
+                                },
+                            },
+                        )
                 except Exception as symbol_exc:
                     logger.error(f"[{symbol}] Erro no ciclo de monitoramento: {symbol_exc}")
                     db_manager.log_event("ERROR", "Main", f"{symbol}: {symbol_exc}")
@@ -984,9 +1142,22 @@ def main():
                         "max_open_positions": int(risk_cfg.get("max_open_positions", 1)),
                     }
                     append_runtime_event(runtime_snapshot, symbol, f"Erro de monitoramento: {symbol_exc}", "ERROR")
+                    emit_notification_safely(
+                        notification_service,
+                        {
+                            "event_type": "SYMBOL_MONITOR_ERROR",
+                            "category": "health",
+                            "priority": "P1",
+                            "severity": "critical",
+                            "message": f"{symbol}: erro de monitoramento detectado.",
+                            "symbol": symbol,
+                            "metadata": {"error": str(symbol_exc)},
+                        },
+                    )
 
             loop_counter += 1
             runtime_snapshot["updated_at"] = datetime.now().isoformat(timespec="seconds")
+            runtime_snapshot["notifications"] = notification_service.snapshot()
             now_write_ts = time.time()
             if (now_write_ts - last_runtime_write_ts) >= 1.0:
                 write_runtime_snapshot(runtime_snapshot)
@@ -1003,6 +1174,17 @@ def main():
     except Exception as exc:
         logger.error(f"Erro critico: {exc}")
         db_manager.log_event("CRITICAL", "Main", f"Erro critico: {exc}")
+        emit_notification_safely(
+            notification_service,
+            {
+                "event_type": "ENGINE_CRITICAL_ERROR",
+                "category": "health",
+                "priority": "P1",
+                "severity": "critical",
+                "message": "Erro critico no motor principal do robo.",
+                "metadata": {"error": str(exc)},
+            },
+        )
         runtime_snapshot["status"] = "error"
         runtime_snapshot["updated_at"] = datetime.now().isoformat(timespec="seconds")
         append_runtime_event(runtime_snapshot, "SYSTEM", f"Erro critico: {exc}", "CRITICAL")

@@ -260,6 +260,26 @@ def get_runtime(user: str = Depends(get_current_user)):
     with open(FIMATHE_RUNTIME_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
+@app.get("/notifications")
+def get_notifications(limit: int = 100, user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        notifications = db.get_notifications(limit=max(1, min(int(limit), 300)))
+        metrics = db.get_notification_metrics()
+        return {"items": notifications, "metrics": metrics}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/notifications/metrics")
+def get_notifications_metrics(user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        return db.get_notification_metrics()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 @app.get("/api/chart/{symbol}")
 def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current_user)):
     # Mapping timeframe string to MT5 timeframe constants

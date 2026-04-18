@@ -1,8 +1,8 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useMemo, useReducer, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Cpu, Zap, ShieldAlert, Bot, TrendingUp, Brain, Info, Crosshair } from 'lucide-react';
+import { Terminal, Cpu, Zap, ShieldAlert, Bot, TrendingUp, Brain, Info, Crosshair, Lock } from 'lucide-react';
 import type { FimatheAsset } from '@/types';
 
 type RuntimeEvent = {
@@ -27,6 +27,7 @@ type RuntimeAssetExt = FimatheAsset & {
   near_trade_region?: boolean;
   nearest_trade_region_points?: number;
   sr_tolerance_points?: number;
+  box_locked?: boolean;
 };
 
 interface NarrativeTerminalProps {
@@ -348,6 +349,16 @@ export default function NarrativeTerminal({ assetRuntime, recentEvents }: Narrat
           <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           <span className="text-[9px] font-black text-primary/80 uppercase tracking-widest">Event Stream</span>
         </div>
+        {assetRuntime?.box_locked && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-sky-500/10 border border-sky-500/30 shadow-[0_0_10px_rgba(14,165,233,0.2)]"
+          >
+            <Lock className="w-3 h-3 text-sky-400 animate-pulse" />
+            <span className="text-[9px] font-black text-sky-400 uppercase tracking-tighter">Caixote Travado</span>
+          </motion.div>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar font-mono scroll-smooth">

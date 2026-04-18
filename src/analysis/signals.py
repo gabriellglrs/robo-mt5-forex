@@ -16,6 +16,10 @@ class SignalDetector:
         self.logger = logging.getLogger("SignalDetector")
         symbol_info = mt5.symbol_info(symbol)
         self.point = symbol_info.point if symbol_info and symbol_info.point else 0.00001
+        
+        # MECANISMO DE PERSISTÊNCIA FIMATHE
+        self.locked_box = None
+        self.last_trend = None
 
     def _get_timeframe_code(self, tf_string):
         mapping = {
@@ -209,13 +213,24 @@ class SignalDetector:
 
         trend_direction, slope_points = self._detect_trend(trend_df.tail(trend_candles))
 
-        # CÁLCULO DE PROJEÇÃO (Sempre executado para garantir que a UI tenha os níveis atualizados)
-        # Se a tendência for lateral, usamos 'BUY' apenas como base técnica para o lookback, 
-        # mas o sinal continuará bloqueado pela máquina de estados.
-        projection_map = self._build_ab_projection(trend_df, trend_direction or "BUY")
+        # MECANISMO DE BOX LOCKING (Cadeado Fimathe)
+        # Se a tendência mudou, resetamos o cadeado para recalcular o canal
+        if trend_direction != self.last_trend:
+            self.locked_box = None
+            self.last_trend = trend_direction
+
+        # Se não temos um box travado, calculamos um novo dinamicamente
+        if self.locked_box is None:
+            projection_map = self._build_ab_projection(trend_df, trend_direction or "BUY")
+        else:
+            # Usamos o box que foi travado anteriormente quando o mercado estava em agrupamento
+            projection_map = self.locked_box
+
         ab_ok = projection_map.get("point_a") is not None and projection_map.get("point_b") is not None
 
         if trend_direction is None:
+            # Se lateral, não travamos nada, apenas mostramos a projeção atual
+            self.locked_box = None
             technicals = {"data_ok": True, "trend_direction": None}
             decision = evaluate_state_machine(technicals, self.settings)
             
@@ -300,7 +315,6 @@ class SignalDetector:
         pullback_tolerance_price = pullback_tolerance * float(self.point)
 
         # Determine candidate signal based on position relative to channel_mid
-        # Even if trend is BUY, we might have a candidate SELL (reversal)
         is_above_mid = current_price >= channel_mid
         
         if is_above_mid:
@@ -346,6 +360,17 @@ class SignalDetector:
         
         # Execute decision
         decision = evaluate_state_machine(technicals, self.settings)
+
+        # TRAVAMENTO DO BOX (FIM-001/002)
+        # Se as condições de agrupamento (caixote) forem atingidas, travamos esta caixa técnica no detector.
+        # Isso impede que o Ponto A/B "corram" atrás do preço se ele renovar máxima/mínima sem romper.
+        if technicals["grouping_ok"] and self.locked_box is None:
+            self.logger.info(f"[{self.symbol}] Agrupamento (FIM-001) detectado. Travando canal tecnico para aguardar rompimento.")
+            self.locked_box = projection_map
+
+        # Se houver um sinal de entrada, podemos liberar o box após a execução ou manter até o ciclo acabar.
+        if decision["signal"]:
+            self.logger.info(f"[{self.symbol}] Sinal {decision['signal']} gerado. O box permanecera travado ate o fim do ciclo ou reversao.")
 
         # Build final payload
         return {
@@ -410,7 +435,8 @@ class SignalDetector:
             "rule_name": decision["rule_name"],
             "next_trigger": decision["next_trigger"],
             "structural_ok": structural_ok,
-            "reversal_ok": reversal_ok
+            "reversal_ok": reversal_ok,
+            "box_locked": self.locked_box is not None
         }
 
     def get_signal(self, current_price, levels, indicators=None):
@@ -423,4 +449,3 @@ class SignalDetector:
             )
             return final_signal
         return None
-

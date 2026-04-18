@@ -80,14 +80,22 @@ def validate_and_normalize_settings(settings: dict) -> dict:
     # Parâmetros de suporte e spread
     sr_tolerance = _to_int(signal_logic.get("sr_tolerance_points", 35), "signal_logic.sr_tolerance_points", errors)
     max_spread = _to_int(signal_logic.get("max_spread_points", 30), "signal_logic.max_spread_points", errors)
+    breakout_buffer = _to_int(signal_logic.get("breakout_buffer_points", 10), "signal_logic.breakout_buffer_points", errors)
+    pullback_tolerance = _to_int(signal_logic.get("pullback_tolerance_points", 20), "signal_logic.pullback_tolerance_points", errors)
     slope_min = _to_float(signal_logic.get("trend_min_slope_points", 0.20), "signal_logic.trend_min_slope_points", errors)
     _validate_range(sr_tolerance, "signal_logic.sr_tolerance_points", 1, 2000, errors)
     _validate_range(max_spread, "signal_logic.max_spread_points", 0, 2000, errors)
+    _validate_range(breakout_buffer, "signal_logic.breakout_buffer_points", 0, 2000, errors)
+    _validate_range(pullback_tolerance, "signal_logic.pullback_tolerance_points", 1, 2000, errors)
     _validate_range(slope_min, "signal_logic.trend_min_slope_points", 0.01, 5000.0, errors)
     if sr_tolerance is not None:
         signal_logic["sr_tolerance_points"] = sr_tolerance
     if max_spread is not None:
         signal_logic["max_spread_points"] = max_spread
+    if breakout_buffer is not None:
+        signal_logic["breakout_buffer_points"] = breakout_buffer
+    if pullback_tolerance is not None:
+        signal_logic["pullback_tolerance_points"] = pullback_tolerance
     if slope_min is not None:
         signal_logic["trend_min_slope_points"] = slope_min
 
@@ -138,6 +146,69 @@ def validate_and_normalize_settings(settings: dict) -> dict:
         "timeout_seconds": timeout_seconds if timeout_seconds is not None else 2.5,
         "retries": retries if retries is not None else 2,
     }
+
+    # Guardrails de combinacao: evita presets com risco alto de bloqueio total de sinais
+    require_grouping = bool(signal_logic.get("require_grouping", True))
+    require_pullback = bool(signal_logic.get("require_pullback_retest", True))
+    require_sr_touch = bool(signal_logic.get("require_sr_touch", True))
+    strict_reversal = bool(signal_logic.get("strict_reversal_logic", True))
+    require_structural = bool(signal_logic.get("require_structural_trend", True))
+    require_breakout = bool(signal_logic.get("require_channel_break", True))
+    trend_tf = str(signal_logic.get("trend_timeframe", "H1")).upper()
+    entry_tf = str(signal_logic.get("entry_timeframe", "M15")).upper()
+
+    if (
+        trend_tf == "M15"
+        and entry_tf == "M1"
+        and require_grouping
+        and require_pullback
+        and require_sr_touch
+        and strict_reversal
+        and require_structural
+    ):
+        errors.append(
+            "combo invalido: Scalper M15/M1 com FIM-006/008/011/015/016 todos ativos tende a bloquear entradas. "
+            "Desative ao menos 1 filtro de confluencia."
+        )
+
+    if (
+        breakout_buffer is not None
+        and pullback_tolerance is not None
+        and pullback_tolerance < breakout_buffer
+    ):
+        errors.append(
+            "combo invalido: signal_logic.pullback_tolerance_points menor que breakout_buffer_points restringe o reteste."
+        )
+
+    if require_sr_touch and sr_tolerance is not None and sr_tolerance < 10:
+        errors.append("combo invalido: signal_logic.sr_tolerance_points < 10 com FIM-008 ativo torna o toque S/R excessivamente restritivo.")
+
+    if (
+        require_breakout
+        and breakout_buffer is not None
+        and sr_tolerance is not None
+        and breakout_buffer > sr_tolerance
+    ):
+        errors.append(
+            "combo invalido: breakout_buffer_points maior que sr_tolerance_points com FIM-007/FIM-008 ativos cria conflito de gatilho."
+        )
+
+    if strict_reversal and require_structural and slope_min is not None and slope_min > 1.5:
+        errors.append(
+            "combo invalido: trend_min_slope_points muito alto (>1.5) com FIM-015/FIM-016 ativos bloqueia reversoes e tendencia em conjunto."
+        )
+
+    raw_symbols = analysis.get("symbols", [])
+    symbols = []
+    if isinstance(raw_symbols, str):
+        symbols = [item.strip().upper() for item in raw_symbols.split(",") if item.strip()]
+    elif isinstance(raw_symbols, list):
+        symbols = [str(item).strip().upper() for item in raw_symbols if str(item).strip()]
+    has_crypto = any(sym.endswith("USD") and (sym.startswith("BTC") or sym.startswith("ETH")) for sym in symbols)
+    if has_crypto and max_spread is not None and max_spread < 20:
+        errors.append(
+            "combo invalido: max_spread_points < 20 para BTC/ETH costuma bloquear operacoes por spread em cripto."
+        )
 
     if errors:
         raise SettingsValidationError(errors)

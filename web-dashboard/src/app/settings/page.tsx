@@ -274,6 +274,91 @@ const SETTINGS_HELP = {
   },
 };
 
+type GuardrailIssue = {
+  key: string;
+  message: string;
+};
+
+function getGuardrailIssues(settings: any): GuardrailIssue[] {
+  if (!settings) return [];
+  const signal = settings.signal_logic || {};
+  const analysis = settings.analysis || {};
+
+  const requireGrouping = !!signal.require_grouping;
+  const requirePullback = !!signal.require_pullback_retest;
+  const requireSrTouch = !!signal.require_sr_touch;
+  const strictReversal = !!signal.strict_reversal_logic;
+  const requireStructural = !!signal.require_structural_trend;
+  const requireBreakout = !!signal.require_channel_break;
+  const trendTf = String(signal.trend_timeframe || 'H1').toUpperCase();
+  const entryTf = String(signal.entry_timeframe || 'M15').toUpperCase();
+  const breakoutBuffer = Number(signal.breakout_buffer_points ?? 10);
+  const pullbackTolerance = Number(signal.pullback_tolerance_points ?? 20);
+  const srTolerance = Number(signal.sr_tolerance_points ?? 35);
+  const maxSpread = Number(signal.max_spread_points ?? 30);
+  const slopeMin = Number(signal.trend_min_slope_points ?? 0.2);
+
+  const rawSymbols = analysis.symbols || [];
+  const symbols = Array.isArray(rawSymbols)
+    ? rawSymbols.map((v: any) => String(v).toUpperCase())
+    : String(rawSymbols).split(',').map((v) => v.trim().toUpperCase()).filter(Boolean);
+  const hasCrypto = symbols.some((sym) => (sym.startsWith('BTC') || sym.startsWith('ETH')) && sym.endsWith('USD'));
+
+  const issues: GuardrailIssue[] = [];
+
+  if (
+    trendTf === 'M15' &&
+    entryTf === 'M1' &&
+    requireGrouping &&
+    requirePullback &&
+    requireSrTouch &&
+    strictReversal &&
+    requireStructural
+  ) {
+    issues.push({
+      key: 'ultra_restrictive_scalper',
+      message: 'Scalper M15/M1 com FIM-006/008/011/015/016 todos ativos tende a bloquear quase todos os sinais.',
+    });
+  }
+
+  if (pullbackTolerance < breakoutBuffer) {
+    issues.push({
+      key: 'pullback_vs_breakout',
+      message: 'Pullback tolerance menor que breakout buffer pode invalidar retestes válidos.',
+    });
+  }
+
+  if (requireSrTouch && srTolerance < 10) {
+    issues.push({
+      key: 'sr_too_tight',
+      message: 'FIM-008 ativo com tolerância S/R abaixo de 10 pontos costuma bloquear entradas.',
+    });
+  }
+
+  if (requireBreakout && breakoutBuffer > srTolerance) {
+    issues.push({
+      key: 'breakout_sr_conflict',
+      message: 'Breakout buffer maior que tolerância S/R cria conflito de gatilho entre FIM-007 e FIM-008.',
+    });
+  }
+
+  if (strictReversal && requireStructural && slopeMin > 1.5) {
+    issues.push({
+      key: 'slope_overfilter',
+      message: 'Inclinação mínima muito alta com FIM-015/FIM-016 ativos superfiltra o mercado.',
+    });
+  }
+
+  if (hasCrypto && maxSpread < 20) {
+    issues.push({
+      key: 'crypto_spread_low',
+      message: 'Para BTC/ETH, spread máximo abaixo de 20 costuma bloquear operações por custo.',
+    });
+  }
+
+  return issues;
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -318,6 +403,14 @@ export default function SettingsPage() {
   const handleSave = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
+    const guardrailIssues = getGuardrailIssues(settings);
+    if (guardrailIssues.length > 0) {
+      setNotification({
+        message: `CONFIGURAÇÃO BLOQUEADA: ${guardrailIssues[0].message}`,
+        type: 'error',
+      });
+      return;
+    }
 
     setSaving(true);
     setNotification({ message: '💾 SALVANDO CONFIGURAÇÕES...', type: 'success' });
@@ -491,6 +584,7 @@ export default function SettingsPage() {
   );
   
   if (!settings) return <div className="p-8 text-white">Erro ao carregar configurações.</div>;
+  const guardrailIssues = getGuardrailIssues(settings);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -549,6 +643,23 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      <section className={`glass p-6 rounded-[32px] border ${guardrailIssues.length > 0 ? 'border-red-500/30 bg-red-500/5' : 'border-primary/20 bg-primary/5'}`}>
+        <div className="flex items-center gap-3 mb-3">
+          <ShieldAlert className={`w-5 h-5 ${guardrailIssues.length > 0 ? 'text-red-400' : 'text-primary'}`} />
+          <h2 className="text-sm font-black tracking-widest uppercase text-white">Guardrails de Configuração</h2>
+        </div>
+        {guardrailIssues.length > 0 ? (
+          <div className="space-y-2">
+            {guardrailIssues.map((issue) => (
+              <p key={issue.key} className="text-xs text-red-300 leading-relaxed">• {issue.message}</p>
+            ))}
+            <p className="text-[10px] text-red-200/70 uppercase tracking-widest font-bold mt-2">Ajuste os campos para liberar o botão salvar.</p>
+          </div>
+        ) : (
+          <p className="text-xs text-primary/90 leading-relaxed">Configuração coerente. Nenhum conflito crítico detectado.</p>
+        )}
+      </section>
 
       {/* Premium Toast Notification */}
       {notification && (

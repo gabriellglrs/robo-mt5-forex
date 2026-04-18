@@ -249,3 +249,15 @@ Registrar funcionalidades pendentes para uso operacional real do robo com MetaTr
    - sessao robusta, perfis de usuario e CORS restrito por ambiente.
 2. Exportacao e relatorios:
    - export real (CSV/JSON) de logs/trades e relatorio diario de performance/risco.
+
+### Phase 22: Notificacoes Operacionais Fimathe (Tempo Real)
+**Goal**: Implementar um sistema de notificacoes operacionais com baixa latencia e baixo ruido, cobrindo eventos criticos de execucao, risco e saude do robo.
+**Depends on**: Phase 21, Phase 21.1
+**Success Criteria**:
+1. Alertas P1 para abertura/fechamento/rejeicao de ordens e erros criticos do motor.
+2. Alertas de gestao de risco para BE (0x0), trailing de SL e limite de exposicao (FIM-012).
+3. Mecanismo anti-spam com cooldown, deduplicacao por evento e agregacao de eventos repetidos.
+4. Entrega inicial via Telegram com templates padronizados por tipo de evento.
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 22 to break down)

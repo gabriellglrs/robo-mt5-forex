@@ -7,8 +7,8 @@
         ],
         "history_years": 2,
         "wick_sensitivity": 0.3,
-        "trend_candles": 60,
-        "ab_lookback_candles": 5
+        "trend_candles": 120,
+        "ab_lookback_candles": 40
     },
     "signal_logic": {
         "trend_timeframe": "M15",
@@ -24,7 +24,7 @@
         "strict_reversal_logic": true,
         "require_structural_trend": true,
         "triangle_m1_candles": 5,
-        "target_level_mode": "80",
+        "target_level_mode": "100",
         "trading_type": "scalper",
         "max_slippage_points": 30,
         "fimathe_cycle_top_level": "100"
@@ -38,7 +38,7 @@
         "breakeven_trigger_points": 120,
         "breakeven_offset_points": 5,
         "fimathe_cycle_enabled": true,
-        "fimathe_management_mode": "conservative",
+        "fimathe_management_mode": "infinity",
         "fimathe_be_trigger_percent": 50,
         "fimathe_cycle_breakeven_offset_points": 10,
         "fimathe_trail_step_percent": 100
