@@ -1,17 +1,18 @@
-"use client";
+﻿"use client";
 
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Settings, 
-  Activity, 
-  Terminal, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  Settings,
+  Activity,
+  Terminal,
+  TrendingUp,
   ShieldCheck,
   Zap,
   GraduationCap,
+  BookOpenCheck,
   ChevronLeft,
-  Menu
+  Menu,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -23,6 +24,7 @@ const menuItems = [
   { icon: TrendingUp, label: 'Estatísticas', href: '/stats' },
   { icon: Terminal, label: 'Logs & Auditoria', href: '/logs' },
   { icon: Settings, label: 'Configurações', href: '/settings' },
+  { icon: BookOpenCheck, label: 'Como o Robô Opera', href: '/estrategia' },
   { icon: GraduationCap, label: 'Fimathe Academy', href: '/academy' },
 ];
 
@@ -148,3 +150,4 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
     </motion.aside>
   );
 }
+
