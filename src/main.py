@@ -62,10 +62,40 @@ def parse_symbols(settings):
     return symbols
 
 
+def normalize_signal_logic_cfg(signal_cfg):
+    cfg = dict(signal_cfg or {})
+    raw_top = cfg.get("fimathe_cycle_top_level", cfg.get("target_level_mode", "80"))
+    top_level = str(raw_top)
+    if top_level not in {"50", "80", "85", "90", "95", "100"}:
+        top_level = "80"
+
+    # Mantem os campos sincronizados para compatibilidade (web e legado).
+    cfg["fimathe_cycle_top_level"] = top_level
+    cfg["target_level_mode"] = top_level
+    return cfg
+
+
+def normalize_risk_cfg(risk_cfg):
+    cfg = dict(risk_cfg or {})
+
+    # Web usa risk_percent; engine de lote usa risk_percentage.
+    if cfg.get("risk_percentage") is None and cfg.get("risk_percent") is not None:
+        cfg["risk_percentage"] = cfg.get("risk_percent")
+
+    # Se o usuário veio da web (sem lot_mode), assume lote por risco.
+    if cfg.get("lot_mode") is None and cfg.get("risk_percent") is not None:
+        cfg["lot_mode"] = "risk_percent"
+
+    if cfg.get("risk_max_per_trade_percent") is None:
+        cfg["risk_max_per_trade_percent"] = 3.0
+
+    return cfg
+
+
 def build_symbol_engines(symbols, settings, db_manager):
     analysis_cfg = settings.get("analysis", {})
-    signal_logic_cfg = settings.get("signal_logic", {})
-    risk_cfg = settings.get("risk_management", {})
+    signal_logic_cfg = normalize_signal_logic_cfg(settings.get("signal_logic", {}))
+    risk_cfg = normalize_risk_cfg(settings.get("risk_management", {}))
 
     engines = {}
 
@@ -229,7 +259,19 @@ def append_runtime_event(runtime_snapshot, symbol, message, level="INFO"):
         del events[:-80]
 
 
-def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, max_pos, point, breakout_buffer_points, trailing_summary, trading_type="manual", current_pnl=0.0):
+def build_runtime_symbol_snapshot(
+    symbol,
+    current_price,
+    details,
+    open_count,
+    max_pos,
+    point,
+    breakout_buffer_points,
+    trailing_summary,
+    trading_type="manual",
+    current_pnl=0.0,
+    digits=5,
+):
     reason = details.get("reason")
     signal = details.get("signal")
     trend_direction = details.get("trend_direction")
@@ -296,6 +338,11 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
         rule_id = "FIM-012" # Relacionado a Limite de Risco/Exposicao
         next_trigger = "Aguardar fechamento de posicao para liberar nova entrada."
 
+    try:
+        digits = int(digits)
+    except Exception:
+        digits = 5
+
     return {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "symbol": symbol,
@@ -340,6 +387,8 @@ def build_runtime_symbol_snapshot(symbol, current_price, details, open_count, ma
         "trailing_updates": trailing_updates,
         "trailing_actions": trailing_summary.get("actions", []),
         "last_cycle_action": last_cycle_action,
+        "point": point,
+        "digits": digits,
     }
 
 
@@ -649,8 +698,8 @@ def main():
 
             # 2. Re-calcula parâmetros dinâmicos para suportar 'Hot-Reload' total sem restart
             analysis_cfg = settings.get("analysis", {})
-            signal_cfg = settings.get("signal_logic", {})
-            risk_cfg = settings.get("risk_management", {})
+            signal_cfg = normalize_signal_logic_cfg(settings.get("signal_logic", {}))
+            risk_cfg = normalize_risk_cfg(settings.get("risk_management", {}))
             
             breakout_buffer_points = max(0, int(signal_cfg.get("breakout_buffer_points", 10)))
             symbol_cooldown_seconds = max(0, int(risk_cfg.get("symbol_cooldown_seconds", 300)))
@@ -667,11 +716,14 @@ def main():
                 "update_min_step_points": max(1, int(risk_cfg.get("trailing_update_min_step_points", 20))),
                 "update_cooldown_seconds": max(1, int(risk_cfg.get("trailing_update_cooldown_seconds", 3))),
                 "fimathe_cycle_enabled": bool(risk_cfg.get("fimathe_cycle_enabled", True)),
-                "fimathe_cycle_top_level": str(signal_cfg.get("target_level_mode", "80")),
+                "fimathe_cycle_top_level": str(signal_cfg.get("fimathe_cycle_top_level", signal_cfg.get("target_level_mode", "80"))),
                 "fimathe_cycle_top_retrace_points": max(1, int(risk_cfg.get("fimathe_cycle_top_retrace_points", 45))),
                 "fimathe_cycle_min_profit_points": max(1, int(risk_cfg.get("fimathe_cycle_min_profit_points", 80))),
                 "fimathe_cycle_protection_buffer_points": max(1, int(risk_cfg.get("fimathe_cycle_protection_buffer_points", 12))),
                 "fimathe_cycle_breakeven_offset_points": max(0, int(risk_cfg.get("fimathe_cycle_breakeven_offset_points", 5))),
+                "fimathe_management_mode": str(risk_cfg.get("fimathe_management_mode", "standard")).lower(),
+                "fimathe_be_trigger_percent": max(1, int(risk_cfg.get("fimathe_be_trigger_percent", 50))),
+                "fimathe_trail_step_percent": max(1, int(risk_cfg.get("fimathe_trail_step_percent", 100))),
             }
             
             analysis_flow_interval_seconds = max(5, int(settings.get("ui_settings", {}).get("analysis_flow_interval_seconds", 15)))
@@ -732,7 +784,7 @@ def main():
                     )
 
                     # Atualiza configurações dinâmicas no signal_detector e risk_manager
-                    signal_cfg_current = dict(settings.get("signal_logic", {}))
+                    signal_cfg_current = normalize_signal_logic_cfg(settings.get("signal_logic", {}))
                     analysis_cfg_current = settings.get("analysis", {})
                     
                     # Ponte Crítica: Garante que o Lookback configurado na UI (em analysis) chegue ao motor
@@ -741,9 +793,9 @@ def main():
                     
                     engine["signal_detector"].settings = signal_cfg_current
                     
-                    risk_cfg_current = settings.get("risk_management", {})
+                    risk_cfg_current = normalize_risk_cfg(settings.get("risk_management", {}))
                     # Inject strategy flags for risk manager
-                    risk_cfg_current["fimathe_target_level"] = settings.get("signal_logic", {}).get("target_level_mode", "80")
+                    risk_cfg_current["fimathe_target_level"] = signal_cfg_current.get("fimathe_cycle_top_level", "80")
                     
                     engine["risk_manager"].config = risk_cfg_current
                     engine["risk_manager"].settings = risk_cfg_current
@@ -804,6 +856,8 @@ def main():
                         details["rule_name"] = "Limites de exposicao"
                         details["next_trigger"] = "Aguardar vaga de exposicao para liberar nova entrada."
                     signal_point = getattr(engine["signal_detector"], "point", 0.00001) or 0.00001
+                    symbol_info = mt5.symbol_info(symbol)
+                    symbol_digits = int(symbol_info.digits) if symbol_info and symbol_info.digits is not None else 5
 
                     symbol_snapshot = build_runtime_symbol_snapshot(
                         symbol=symbol,
@@ -816,6 +870,7 @@ def main():
                         trailing_summary=trailing_summary,
                         trading_type=signal_cfg.get("trading_type", "manual"),
                         current_pnl=pnl_by_symbol.get(symbol, 0.0),
+                        digits=symbol_digits,
                     )
                     previous_reason = runtime_snapshot["symbols"].get(symbol, {}).get("reason")
                     runtime_snapshot["symbols"][symbol] = symbol_snapshot
@@ -888,7 +943,7 @@ def main():
                     # Usa lot do risk_manager (que deve ser atualizado se o settings mudou)
                     # Nota: simplificando para esta fase de UX, o risk_manager usa o config estático do init.
                     # TODO: Implementar RiskManager.update_config(risk_cfg)
-                    risk_cfg_current = settings.get("risk_management", {})
+                    risk_cfg_current = normalize_risk_cfg(settings.get("risk_management", {}))
                     engine["risk_manager"].config = risk_cfg_current # Atualização bruta para a fase de UX
                     
                     lot = engine["risk_manager"].calculate_lot(abs(current_price - sl))
@@ -904,7 +959,7 @@ def main():
                         sl=sl,
                         tp=tp,
                         deviation=deviation,
-                        timeframe=",".join(timeframes),
+                        timeframe=f"{details.get('trend_timeframe', signal_cfg_current.get('trend_timeframe', 'H1'))},{details.get('entry_timeframe', signal_cfg_current.get('entry_timeframe', 'M15'))}",
                         strategy=STRATEGY_NAME,
                         indicators=details,
                     )
