@@ -38,6 +38,16 @@ class NotificationPolicy:
         event_key = self.build_event_key(event)
         event_type = str(event.get("event_type") or "UNKNOWN")
         symbol = str(event.get("symbol") or "GLOBAL")
+        priority = str(event.get("priority") or "P2").upper()
+
+        # P1 (Critical) bypasses anti-spam (always allowed)
+        if priority == "P1":
+            return {
+                "allowed": True,
+                "reason": "critical_bypass",
+                "event_key": event_key,
+                "aggregated_count": 1,
+            }
 
         last_seen = self._last_seen_by_key.get(event_key)
         if last_seen and (now - last_seen) < self.dedupe_window_seconds:

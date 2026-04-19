@@ -1,56 +1,50 @@
 from __future__ import annotations
-
 from datetime import datetime
+from typing import Dict, Optional, Any
+from pydantic import BaseModel, Field, validator
 
 ALLOWED_PRIORITIES = {"P1", "P2", "P3"}
 ALLOWED_SEVERITIES = {"critical", "high", "medium", "low"}
 ALLOWED_CATEGORIES = {"execution", "risk", "health", "setup"}
 
+class NotificationEvent(BaseModel):
+    """Contrato canonico para eventos de notificacao do sistema."""
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
+    event_type: str = Field(default="UNKNOWN_EVENT")
+    category: str = Field(default="setup")
+    priority: str = Field(default="P2")
+    severity: str = Field(default="medium")
+    message: str = Field(default="Evento operacional sem mensagem.")
+    symbol: Optional[str] = None
+    ticket: Optional[int] = None
+    side: Optional[str] = None
+    rule_id: Optional[str] = None
+    price: Optional[float] = None
+    sl: Optional[float] = None
+    tp: Optional[float] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-def _as_float(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
+    @validator("priority")
+    def validate_priority(cls, v):
+        v = v.upper()
+        return v if v in ALLOWED_PRIORITIES else "P2"
 
+    @validator("severity")
+    def validate_severity(cls, v):
+        v = v.lower()
+        return v if v in ALLOWED_SEVERITIES else "medium"
+
+    @validator("category")
+    def validate_category(cls, v):
+        v = v.lower()
+        return v if v in ALLOWED_CATEGORIES else "setup"
 
 def normalize_notification_event(payload: dict) -> dict:
-    """Normaliza evento de notificacao para contrato canonico e serializavel."""
-    event = dict(payload or {})
-    now_iso = datetime.now().isoformat(timespec="seconds")
-
-    priority = str(event.get("priority") or "P2").upper()
-    if priority not in ALLOWED_PRIORITIES:
-        priority = "P2"
-
-    severity = str(event.get("severity") or "medium").lower()
-    if severity not in ALLOWED_SEVERITIES:
-        severity = "medium"
-
-    category = str(event.get("category") or "setup").lower()
-    if category not in ALLOWED_CATEGORIES:
-        category = "setup"
-
-    ticket = event.get("ticket")
+    """Helper para manter compatibilidade e facilitar criacao de eventos a partir de dicts brutos."""
     try:
-        ticket = int(ticket) if ticket is not None else None
-    except (TypeError, ValueError):
-        ticket = None
-
-    return {
-        "timestamp": str(event.get("timestamp") or now_iso),
-        "event_type": str(event.get("event_type") or "UNKNOWN_EVENT"),
-        "category": category,
-        "priority": priority,
-        "severity": severity,
-        "message": str(event.get("message") or "Evento operacional sem mensagem."),
-        "symbol": event.get("symbol"),
-        "ticket": ticket,
-        "side": event.get("side"),
-        "rule_id": event.get("rule_id"),
-        "price": _as_float(event.get("price")),
-        "sl": _as_float(event.get("sl")),
-        "tp": _as_float(event.get("tp")),
-        "metadata": event.get("metadata") if isinstance(event.get("metadata"), dict) else {},
-    }
+        event = NotificationEvent(**(payload or {}))
+        return event.dict()
+    except Exception:
+        # Fallback de seguranca caso o payload seja muito malformado
+        return NotificationEvent().dict()
 

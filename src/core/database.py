@@ -105,6 +105,8 @@ class DatabaseManager:
             delivery_status VARCHAR(20),
             delivery_error TEXT NULL,
             delivered_at DATETIME NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            read_at DATETIME NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -124,6 +126,16 @@ class DatabaseManager:
             except Exception:
                 pass # Coluna ja existe
 
+            # Migracoes idempotentes da tabela de notificacoes
+            try:
+                cursor.execute("ALTER TABLE notification_events ADD COLUMN is_read TINYINT(1) DEFAULT 0")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE notification_events ADD COLUMN read_at DATETIME NULL")
+            except Exception:
+                pass
+
             conn.commit()
             self.logger.info("Tabelas do sistema (trades, logs, settings) verificadas/criadas.")
         finally:
@@ -136,11 +148,11 @@ class DatabaseManager:
         INSERT INTO notification_events (
             event_key, event_type, category, priority, severity, symbol, ticket, side, rule_id, message,
             price, sl, tp, metadata_json, status, suppression_reason, aggregated_count,
-            delivery_channel, delivery_status, delivery_error, delivered_at, created_at
+            delivery_channel, delivery_status, delivery_error, delivered_at, is_read, read_at, created_at
         ) VALUES (
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s
         )
         """
         delivered_at = event.get("delivered_at")
@@ -180,6 +192,8 @@ class DatabaseManager:
             event.get("delivery_status"),
             event.get("delivery_error"),
             delivered_at_dt,
+            0,
+            None,
             created_at_dt,
         )
 
@@ -203,7 +217,7 @@ class DatabaseManager:
         SELECT
             id, event_key, event_type, category, priority, severity, symbol, ticket, side, rule_id, message,
             price, sl, tp, metadata_json, status, suppression_reason, aggregated_count,
-            delivery_channel, delivery_status, delivery_error, delivered_at, created_at
+            delivery_channel, delivery_status, delivery_error, delivered_at, is_read, read_at, created_at
         FROM notification_events
         ORDER BY id DESC
         LIMIT %s
@@ -226,6 +240,7 @@ class DatabaseManager:
                     row["metadata"] = raw
                 else:
                     row["metadata"] = {}
+                row["is_read"] = bool(row.get("is_read"))
             return rows
         except Exception as exc:
             self.logger.error(f"Erro ao carregar notificacoes: {exc}")
@@ -239,6 +254,8 @@ class DatabaseManager:
     def get_notification_metrics(self):
         sql = """
         SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) AS unread_count,
             SUM(CASE WHEN status IN ('emitted', 'delivery_failed') THEN 1 ELSE 0 END) AS emitted,
             SUM(CASE WHEN status = 'suppressed' THEN 1 ELSE 0 END) AS suppressed,
             SUM(CASE WHEN status = 'delivery_failed' THEN 1 ELSE 0 END) AS delivery_failed
@@ -252,13 +269,99 @@ class DatabaseManager:
             cursor.execute(sql)
             row = cursor.fetchone() or {}
             return {
+                "total": int(row.get("total") or 0),
+                "unread_count": int(row.get("unread_count") or 0),
                 "emitted": int(row.get("emitted") or 0),
                 "suppressed": int(row.get("suppressed") or 0),
                 "delivery_failed": int(row.get("delivery_failed") or 0),
             }
         except Exception as exc:
             self.logger.error(f"Erro ao carregar metricas de notificacao: {exc}")
-            return {"emitted": 0, "suppressed": 0, "delivery_failed": 0}
+            return {"total": 0, "unread_count": 0, "emitted": 0, "suppressed": 0, "delivery_failed": 0}
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def mark_notification_read(self, notification_id: int):
+        sql = """
+        UPDATE notification_events
+        SET is_read = 1, read_at = %s
+        WHERE id = %s AND is_read = 0
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, (datetime.now(), int(notification_id)))
+            conn.commit()
+            return int(cursor.rowcount or 0)
+        except Exception as exc:
+            self.logger.error(f"Erro ao marcar notificacao como lida: {exc}")
+            return 0
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def mark_all_notifications_read(self):
+        sql = """
+        UPDATE notification_events
+        SET is_read = 1, read_at = %s
+        WHERE is_read = 0
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, (datetime.now(),))
+            conn.commit()
+            return int(cursor.rowcount or 0)
+        except Exception as exc:
+            self.logger.error(f"Erro ao marcar todas notificacoes como lidas: {exc}")
+            return 0
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def delete_notification(self, notification_id: int):
+        sql = "DELETE FROM notification_events WHERE id = %s"
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, (int(notification_id),))
+            conn.commit()
+            return int(cursor.rowcount or 0)
+        except Exception as exc:
+            self.logger.error(f"Erro ao deletar notificacao: {exc}")
+            return 0
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def clear_notifications(self):
+        sql = "DELETE FROM notification_events"
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql)
+            conn.commit()
+            return int(cursor.rowcount or 0)
+        except Exception as exc:
+            self.logger.error(f"Erro ao limpar notificacoes: {exc}")
+            return 0
         finally:
             if cursor is not None:
                 cursor.close()

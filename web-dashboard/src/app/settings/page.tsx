@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { 
   Save, 
   RotateCcw, 
@@ -223,6 +224,76 @@ const CHANNEL_PRESETS: Record<string, { label: string; ab: number; trend: number
   macro: { label: 'Macro', ab: 200, trend: 300 },
 };
 
+const FACTORY_STRATEGY_SETTINGS = {
+  running_state: true,
+  analysis: {
+    symbols: ["BTCUSD", "ETHUSD"],
+    history_years: 2,
+    wick_sensitivity: 0.3,
+    trend_candles: 120,
+    ab_lookback_candles: 40,
+  },
+  signal_logic: {
+    trend_timeframe: "H1",
+    entry_timeframe: "M15",
+    breakout_buffer_points: 10,
+    pullback_tolerance_points: 20,
+    trend_min_slope_points: 0.2,
+    sr_tolerance_points: 35,
+    require_grouping: true,
+    require_channel_break: true,
+    require_sr_touch: true,
+    max_spread_points: 30,
+    require_pullback_retest: true,
+    strict_reversal_logic: true,
+    require_structural_trend: true,
+    triangle_m1_candles: 5,
+    target_level_mode: "80",
+    trading_type: "day_trader",
+    max_slippage_points: 30,
+    fimathe_cycle_top_level: "80",
+  },
+  risk_management: {
+    risk_percent: 1.0,
+    max_open_positions: 1,
+    magic_number: 202404,
+    symbol_cooldown_seconds: 300,
+    use_breakeven: true,
+    breakeven_trigger_points: 120,
+    breakeven_offset_points: 5,
+    fimathe_cycle_enabled: true,
+    fimathe_management_mode: "standard",
+    fimathe_be_trigger_percent: 50,
+    fimathe_cycle_breakeven_offset_points: 10,
+    fimathe_trail_step_percent: 100,
+  },
+  ui_settings: {
+    analysis_flow_interval_seconds: 5,
+    theme: "dark",
+    log_cleanup_minutes: 15,
+  },
+  log_management: {
+    mode: "quantity",
+    value: 50,
+  },
+  notifications: {
+    enabled: true,
+    min_priority: "P2",
+    categories: {
+      execution: true,
+      risk: true,
+      health: true,
+      setup: false,
+    },
+    telegram: {
+      bot_token: "",
+      chat_id: "",
+      timeout_seconds: 2.5,
+      retries: 2,
+    },
+  },
+};
+
 const SETTINGS_HELP = {
   // Analysis
   history_years: { title: "Lookback Histórico", content: "Define quantos anos de dados o robô analisa. Mais dados ajudam a identificar suportes históricos, mas aumentam o processamento." },
@@ -234,6 +305,7 @@ const SETTINGS_HELP = {
   trend_timeframe: { title: "Timeframe Tendência", content: "O gráfico de tempo maior usado para a 'Tendência de Referência'. É a direção primária que o robô segue." },
   entry_timeframe: { title: "Timeframe Entrada", content: "Gráfico menor usado para achar o gatilho. Onde os rompimentos e agrupamentos são validados antes da ordem." },
   breakout_buffer: { title: "Breakout Buffer", content: "Filtro de segurança (em pontos). O preço deve romper a linha por esta distância para evitar sinais falsos (violinos)." },
+  pullback_tolerance: { title: "Pullback Tolerance", content: "Distância máxima em pontos para validar o reteste da borda após rompimento. Muito baixo pode bloquear entradas." },
   slope_min: { title: "Inclinação Mínima", content: "Impede o robô de operar em mercados laterais ou com tendências fracas demais para serem confiáveis." },
   sr_tolerance: { title: "Tolerância S/R", content: "Margem de erro (em pontos) para validar o toque em níveis históricos de Suporte e Resistência." },
   require_grouping: { title: "Exigir Agrupamento", content: "Obrigatório na Fimathe Purista: o preço deve consolidar antes de romper o canal para validar a entrada." },
@@ -277,6 +349,8 @@ const SETTINGS_HELP = {
 type GuardrailIssue = {
   key: string;
   message: string;
+  fields: string[];
+  rules?: string[];
 };
 
 function getGuardrailIssues(settings: any): GuardrailIssue[] {
@@ -318,6 +392,22 @@ function getGuardrailIssues(settings: any): GuardrailIssue[] {
     issues.push({
       key: 'ultra_restrictive_scalper',
       message: 'Scalper M15/M1 com FIM-006/008/011/015/016 todos ativos tende a bloquear quase todos os sinais.',
+      fields: [
+        'trend_timeframe',
+        'entry_timeframe',
+        'require_grouping',
+        'require_pullback_retest',
+        'require_sr_touch',
+        'strict_reversal_logic',
+        'require_structural_trend',
+      ],
+      rules: [
+        'require_grouping',
+        'require_pullback_retest',
+        'require_sr_touch',
+        'strict_reversal_logic',
+        'require_structural_trend',
+      ],
     });
   }
 
@@ -325,6 +415,7 @@ function getGuardrailIssues(settings: any): GuardrailIssue[] {
     issues.push({
       key: 'pullback_vs_breakout',
       message: 'Pullback tolerance menor que breakout buffer pode invalidar retestes válidos.',
+      fields: ['pullback_tolerance_points', 'breakout_buffer_points'],
     });
   }
 
@@ -332,6 +423,8 @@ function getGuardrailIssues(settings: any): GuardrailIssue[] {
     issues.push({
       key: 'sr_too_tight',
       message: 'FIM-008 ativo com tolerância S/R abaixo de 10 pontos costuma bloquear entradas.',
+      fields: ['require_sr_touch', 'sr_tolerance_points'],
+      rules: ['require_sr_touch'],
     });
   }
 
@@ -339,6 +432,8 @@ function getGuardrailIssues(settings: any): GuardrailIssue[] {
     issues.push({
       key: 'breakout_sr_conflict',
       message: 'Breakout buffer maior que tolerância S/R cria conflito de gatilho entre FIM-007 e FIM-008.',
+      fields: ['require_channel_break', 'breakout_buffer_points', 'sr_tolerance_points'],
+      rules: ['require_channel_break', 'require_sr_touch'],
     });
   }
 
@@ -346,6 +441,8 @@ function getGuardrailIssues(settings: any): GuardrailIssue[] {
     issues.push({
       key: 'slope_overfilter',
       message: 'Inclinação mínima muito alta com FIM-015/FIM-016 ativos superfiltra o mercado.',
+      fields: ['strict_reversal_logic', 'require_structural_trend', 'trend_min_slope_points'],
+      rules: ['strict_reversal_logic', 'require_structural_trend'],
     });
   }
 
@@ -353,6 +450,8 @@ function getGuardrailIssues(settings: any): GuardrailIssue[] {
     issues.push({
       key: 'crypto_spread_low',
       message: 'Para BTC/ETH, spread máximo abaixo de 20 costuma bloquear operações por custo.',
+      fields: ['symbols', 'max_spread_points'],
+      rules: ['max_spread_points'],
     });
   }
 
@@ -400,10 +499,10 @@ export default function SettingsPage() {
     fetchSettings();
   }, [router]);
 
-  const handleSave = async () => {
+  const saveSettingsAndRestart = async (targetSettings: any, successMessage: string) => {
     const token = localStorage.getItem('token');
     if (!token) return;
-    const guardrailIssues = getGuardrailIssues(settings);
+    const guardrailIssues = getGuardrailIssues(targetSettings);
     if (guardrailIssues.length > 0) {
       setNotification({
         message: `CONFIGURAÇÃO BLOQUEADA: ${guardrailIssues[0].message}`,
@@ -423,7 +522,7 @@ export default function SettingsPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ settings }),
+        body: JSON.stringify({ settings: targetSettings }),
       });
       
       const savePayload = await res.json().catch(() => ({}));
@@ -443,9 +542,13 @@ export default function SettingsPage() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      // 3. Delay de 6 segundos para estabilização
-      setNotification({ message: '⏳ SINCRONIZANDO: Aguardando 6 segundos...', type: 'success' });
-      await new Promise(resolve => setTimeout(resolve, 6000));
+      // 3. Delay curto com contagem regressiva visual (2, 1, 0)
+      for (let secondsLeft = 2; secondsLeft >= 0; secondsLeft -= 1) {
+        setNotification({ message: `⏳ SINCRONIZANDO: ${secondsLeft}...`, type: 'success' });
+        if (secondsLeft > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
 
       // 4. Comanda o Início do Robô
       setNotification({ message: '🚀 MOTORIZANDO: Ligando com novos presets...', type: 'success' });
@@ -455,7 +558,7 @@ export default function SettingsPage() {
       });
 
       if (startRes.ok) {
-        setNotification({ message: '✅ SINCRO CONCLUÍDA: Robô operando com novos parâmetros.', type: 'success' });
+        setNotification({ message: successMessage, type: 'success' });
       } else {
         setNotification({ message: '⚠️ AVISO: Configurações salvas, mas o robô não iniciou sozinho.', type: 'error' });
       }
@@ -466,6 +569,27 @@ export default function SettingsPage() {
       setSaving(false);
       setTimeout(() => setNotification(null), 5000);
     }
+  };
+
+  const handleSave = async () => {
+    await saveSettingsAndRestart(settings, '✅ SINCRO CONCLUÍDA: Robô operando com novos parâmetros.');
+  };
+
+  const handleFactoryReset = async () => {
+    if (!settings) return;
+    const confirmed = window.confirm(
+      'Restaurar padrão de fábrica Fimathe? Isso vai sobrescrever estratégia, risco, filtros e presets para o padrão oficial.'
+    );
+    if (!confirmed) return;
+
+    const factorySettings = {
+      ...FACTORY_STRATEGY_SETTINGS,
+      mt5_connection: settings.mt5_connection || {},
+    };
+    await saveSettingsAndRestart(
+      factorySettings,
+      '✅ PADRÃO DE FÁBRICA APLICADO: Estratégia Fimathe oficial restaurada.'
+    );
   };
 
   const handleLogout = () => {
@@ -585,9 +709,21 @@ export default function SettingsPage() {
   
   if (!settings) return <div className="p-8 text-white">Erro ao carregar configurações.</div>;
   const guardrailIssues = getGuardrailIssues(settings);
+  const hasGuardrailConflict = guardrailIssues.length > 0;
+  const conflictedFields = new Set(guardrailIssues.flatMap((issue) => issue.fields || []));
+  const conflictedRules = new Set(guardrailIssues.flatMap((issue) => issue.rules || []));
+  const isFieldConflicted = (...keys: string[]) => keys.some((k) => conflictedFields.has(k));
+  const isRuleConflicted = (ruleKey?: string) => !!ruleKey && conflictedRules.has(ruleKey);
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+    <div className={`relative space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 ${hasGuardrailConflict ? 'critical-screen-active' : ''}`}>
+      {hasGuardrailConflict && (
+        <div className="fixed inset-0 pointer-events-none z-[40] overflow-hidden">
+          <div className="absolute inset-0 critical-red-pulse-bg" />
+          <div className="absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-red-500/30 blur-[130px] critical-red-orb-1" />
+          <div className="absolute -bottom-32 -right-24 w-[380px] h-[380px] rounded-full bg-red-600/30 blur-[130px] critical-red-orb-2" />
+        </div>
+      )}
       <style jsx global>{`
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
@@ -600,6 +736,53 @@ export default function SettingsPage() {
         .premium-input:focus {
            box-shadow: 0 0 15px rgba(0, 212, 255, 0.15);
            border-color: rgba(0, 212, 255, 0.4);
+        }
+        .critical-red-pulse-bg {
+          background: radial-gradient(circle at 25% 20%, rgba(239, 68, 68, 0.20), transparent 45%),
+                      radial-gradient(circle at 80% 78%, rgba(220, 38, 38, 0.22), transparent 48%);
+          animation: criticalRedBgPulse 1.2s ease-in-out infinite alternate;
+        }
+        .critical-red-orb-1 { animation: criticalOrbDriftA 2.2s ease-in-out infinite; }
+        .critical-red-orb-2 { animation: criticalOrbDriftB 2.6s ease-in-out infinite; }
+        .critical-guardrail-card {
+          box-shadow: 0 0 45px rgba(239, 68, 68, 0.28), inset 0 0 32px rgba(239, 68, 68, 0.12);
+          animation: criticalCardPulse 1s ease-in-out infinite alternate;
+        }
+        .critical-field-wrap {
+          border-color: rgba(239, 68, 68, 0.75) !important;
+          background: rgba(127, 29, 29, 0.24) !important;
+          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.45), 0 0 30px rgba(239, 68, 68, 0.25);
+          animation: criticalCardPulse 0.75s ease-in-out infinite alternate;
+        }
+        .critical-input-conflict {
+          border-color: rgba(239, 68, 68, 0.95) !important;
+          background: rgba(127, 29, 29, 0.42) !important;
+          box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.55), 0 0 24px rgba(239, 68, 68, 0.36);
+          animation: criticalFieldPulse 0.55s ease-in-out infinite alternate;
+        }
+        .critical-label-conflict {
+          color: rgb(254 202 202) !important;
+          text-shadow: 0 0 10px rgba(239, 68, 68, 0.45);
+        }
+        @keyframes criticalRedBgPulse {
+          0% { opacity: 0.45; filter: saturate(100%); }
+          100% { opacity: 0.92; filter: saturate(150%); }
+        }
+        @keyframes criticalCardPulse {
+          0% { transform: scale(1); border-color: rgba(248, 113, 113, 0.45); }
+          100% { transform: scale(1.004); border-color: rgba(239, 68, 68, 0.95); }
+        }
+        @keyframes criticalOrbDriftA {
+          0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.45; }
+          100% { transform: translate3d(18px, -12px, 0) scale(1.08); opacity: 0.8; }
+        }
+        @keyframes criticalOrbDriftB {
+          0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.4; }
+          100% { transform: translate3d(-16px, 10px, 0) scale(1.1); opacity: 0.78; }
+        }
+        @keyframes criticalFieldPulse {
+          0% { transform: scale(1); filter: brightness(1); }
+          100% { transform: scale(1.01); filter: brightness(1.25); }
         }
       `}</style>
       
@@ -615,6 +798,12 @@ export default function SettingsPage() {
         </div>
         
         <div className="flex gap-3">
+          <Link
+            href="/estrategia"
+            className="glass px-6 py-2.5 rounded-2xl text-[10px] font-bold text-primary hover:text-white transition-all flex items-center gap-2"
+          >
+            <Info className="w-4 h-4" /> COMO VAI OPERAR
+          </Link>
           <button 
             onClick={handleLogout}
             className="glass px-5 py-2.5 rounded-2xl text-[10px] font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2"
@@ -626,6 +815,13 @@ export default function SettingsPage() {
             className="glass px-6 py-2.5 rounded-2xl text-[10px] font-bold text-gray-400 hover:text-white transition-all flex items-center gap-2"
           >
             <RotateCcw className="w-4 h-4" /> RESETAR
+          </button>
+          <button 
+            onClick={handleFactoryReset}
+            disabled={saving}
+            className="glass px-6 py-2.5 rounded-2xl text-[10px] font-bold text-amber-300 hover:text-amber-200 transition-all flex items-center gap-2 disabled:opacity-60"
+          >
+            <ShieldAlert className="w-4 h-4" /> PADRÃO FÁBRICA
           </button>
           <button 
             onClick={handleSave}
@@ -644,17 +840,17 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <section className={`glass p-6 rounded-[32px] border ${guardrailIssues.length > 0 ? 'border-red-500/30 bg-red-500/5' : 'border-primary/20 bg-primary/5'}`}>
+      <section className={`glass relative z-[61] p-6 rounded-[32px] border ${guardrailIssues.length > 0 ? 'critical-guardrail-card border-red-500/40 bg-red-950/35' : 'border-primary/20 bg-primary/5'}`}>
         <div className="flex items-center gap-3 mb-3">
-          <ShieldAlert className={`w-5 h-5 ${guardrailIssues.length > 0 ? 'text-red-400' : 'text-primary'}`} />
+          <ShieldAlert className={`w-5 h-5 ${guardrailIssues.length > 0 ? 'text-red-300 animate-pulse' : 'text-primary'}`} />
           <h2 className="text-sm font-black tracking-widest uppercase text-white">Guardrails de Configuração</h2>
         </div>
         {guardrailIssues.length > 0 ? (
           <div className="space-y-2">
             {guardrailIssues.map((issue) => (
-              <p key={issue.key} className="text-xs text-red-300 leading-relaxed">• {issue.message}</p>
+              <p key={issue.key} className="text-xs text-red-200 leading-relaxed font-semibold">• {issue.message}</p>
             ))}
-            <p className="text-[10px] text-red-200/70 uppercase tracking-widest font-bold mt-2">Ajuste os campos para liberar o botão salvar.</p>
+            <p className="text-[10px] text-red-100 uppercase tracking-[0.16em] font-black mt-2">ALERTA CRÍTICO: AJUSTE OS CAMPOS PARA LIBERAR O SALVAR.</p>
           </div>
         ) : (
           <p className="text-xs text-primary/90 leading-relaxed">Configuração coerente. Nenhum conflito crítico detectado.</p>
@@ -768,7 +964,7 @@ export default function SettingsPage() {
                        <span className="text-[8px] bg-white/5 px-2 py-0.5 rounded text-gray-500">SELECIONE OS PARES PARA ANÁLISE</span>
                     </label>
                     
-                    <div className="flex flex-wrap gap-2 p-4 bg-white/[0.02] border border-white/5 rounded-[32px]">
+                    <div className={`flex flex-wrap gap-2 p-4 bg-white/[0.02] border border-white/5 rounded-[32px] ${isFieldConflicted('symbols') ? 'critical-field-wrap' : ''}`}>
                       {Array.isArray(settings.analysis?.symbols) && settings.analysis.symbols.map((sym: string) => (
                         <div key={sym} className="flex items-center gap-2 bg-secondary/10 border border-secondary/20 text-secondary px-3 py-1.5 rounded-full text-[10px] font-black group animate-in zoom-in duration-300">
                           {sym}
@@ -868,18 +1064,18 @@ export default function SettingsPage() {
                           className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-secondary transition-all"
                        />
                     </div>
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center">
-                        Slope Mínimo (Pontos)
-                        <InfoTooltip title={SETTINGS_HELP.slope_min.title} content={SETTINGS_HELP.slope_min.content} />
-                      </label>
+                    <div className={`space-y-2 ${isFieldConflicted('trend_min_slope_points') ? 'critical-field-wrap p-3 rounded-2xl' : ''}`}>
+                       <label className={`text-[10px] font-bold text-gray-500 uppercase ml-2 tracking-widest flex items-center ${isFieldConflicted('trend_min_slope_points') ? 'critical-label-conflict' : ''}`}>
+                         Slope Mínimo (Pontos)
+                         <InfoTooltip title={SETTINGS_HELP.slope_min.title} content={SETTINGS_HELP.slope_min.content} />
+                       </label>
                        <input 
                           type="number" step="0.01"
                           value={settings.signal_logic?.trend_min_slope_points || 0.20}
                           onChange={(e) => updateNested('signal_logic', 'trend_min_slope_points', parseFloat(e.target.value))}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-secondary transition-all"
-                       />
-                    </div>
+                          className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-secondary transition-all ${isFieldConflicted('trend_min_slope_points') ? 'critical-input-conflict' : ''}`}
+                        />
+                     </div>
                  </div>
               </div>
             </section>
@@ -919,35 +1115,35 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                  <div className="grid grid-cols-2 gap-6">
+                  <div className={`space-y-2 ${isFieldConflicted('trend_timeframe') ? 'critical-field-wrap p-3 rounded-2xl' : ''}`}>
+                    <label className={`text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center ${isFieldConflicted('trend_timeframe') ? 'critical-label-conflict' : ''}`}>
                         Timeframe Tendência
                         <InfoTooltip title={SETTINGS_HELP.trend_timeframe.title} content={SETTINGS_HELP.trend_timeframe.content} />
                     </label>
                     <select 
                         value={settings.signal_logic?.trend_timeframe || 'H1'}
                         onChange={(e) => updateNested('signal_logic', 'trend_timeframe', e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
+                        className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none ${isFieldConflicted('trend_timeframe') ? 'critical-input-conflict' : ''}`}
                     >
                         {['W1', 'D1', 'H4','H1','M30','M15'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                  <div className={`space-y-2 ${isFieldConflicted('entry_timeframe') ? 'critical-field-wrap p-3 rounded-2xl' : ''}`}>
+                    <label className={`text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center ${isFieldConflicted('entry_timeframe') ? 'critical-label-conflict' : ''}`}>
                         Timeframe Entrada
                         <InfoTooltip title={SETTINGS_HELP.entry_timeframe.title} content={SETTINGS_HELP.entry_timeframe.content} />
                     </label>
                     <select 
                         value={settings.signal_logic?.entry_timeframe || 'M15'}
                         onChange={(e) => updateNested('signal_logic', 'entry_timeframe', e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none"
+                        className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent appearance-none ${isFieldConflicted('entry_timeframe') ? 'critical-input-conflict' : ''}`}
                     >
                         {['M30','M15','M5','M1'].map(tf => <option key={tf} value={tf}>{tf}</option>)}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                  <div className={`space-y-2 ${isFieldConflicted('breakout_buffer_points') ? 'critical-field-wrap p-3 rounded-2xl' : ''}`}>
+                    <label className={`text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center ${isFieldConflicted('breakout_buffer_points') ? 'critical-label-conflict' : ''}`}>
                       Breakout Buffer (Pts)
                       <InfoTooltip title={SETTINGS_HELP.breakout_buffer.title} content={SETTINGS_HELP.breakout_buffer.content} />
                     </label>
@@ -955,11 +1151,23 @@ export default function SettingsPage() {
                         type="number"
                         value={settings.signal_logic?.breakout_buffer_points || 10}
                         onChange={(e) => updateNested('signal_logic', 'breakout_buffer_points', parseInt(e.target.value))}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
+                        className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent ${isFieldConflicted('breakout_buffer_points') ? 'critical-input-conflict' : ''}`}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center">
+                  <div className={`space-y-2 ${isFieldConflicted('pullback_tolerance_points') ? 'critical-field-wrap p-3 rounded-2xl' : ''}`}>
+                    <label className={`text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center ${isFieldConflicted('pullback_tolerance_points') ? 'critical-label-conflict' : ''}`}>
+                      Pullback Tolerance (Pts)
+                      <InfoTooltip title={SETTINGS_HELP.pullback_tolerance.title} content={SETTINGS_HELP.pullback_tolerance.content} />
+                    </label>
+                    <input 
+                        type="number"
+                        value={settings.signal_logic?.pullback_tolerance_points || 20}
+                        onChange={(e) => updateNested('signal_logic', 'pullback_tolerance_points', parseInt(e.target.value))}
+                        className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent ${isFieldConflicted('pullback_tolerance_points') ? 'critical-input-conflict' : ''}`}
+                    />
+                  </div>
+                  <div className={`space-y-2 ${isFieldConflicted('sr_tolerance_points') ? 'critical-field-wrap p-3 rounded-2xl' : ''}`}>
+                    <label className={`text-[10px] text-gray-400 font-bold uppercase ml-2 flex items-center ${isFieldConflicted('sr_tolerance_points') ? 'critical-label-conflict' : ''}`}>
                       S/R Tolerance (Pts)
                       <InfoTooltip title={SETTINGS_HELP.sr_tolerance.title} content={SETTINGS_HELP.sr_tolerance.content} />
                     </label>
@@ -967,7 +1175,7 @@ export default function SettingsPage() {
                         type="number"
                         value={settings.signal_logic?.sr_tolerance_points || 35}
                         onChange={(e) => updateNested('signal_logic', 'sr_tolerance_points', parseInt(e.target.value))}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent"
+                        className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-accent ${isFieldConflicted('sr_tolerance_points') ? 'critical-input-conflict' : ''}`}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1009,6 +1217,8 @@ export default function SettingsPage() {
                     key={rule.id} 
                     className={`glass p-5 rounded-[32px] border transition-all duration-300 relative group ${
                       rule.type === 'MANDATORY' ? 'border-primary/10 bg-primary/[0.01]' : 'border-white/5 hover:border-accent/30'
+                    } ${
+                      isRuleConflicted(rule.key) ? 'critical-field-wrap' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3 relative z-30">
@@ -1035,7 +1245,7 @@ export default function SettingsPage() {
                               (rule.isThreshold ? (settings[rule.category!]?.[rule.key!] > 0) : settings[rule.category!]?.[rule.key!]) 
                               ? 'bg-accent/40 shadow-[0_0_10px_rgba(244,114,182,0.2)]' 
                               : 'bg-white/10'
-                            }`}
+                            } ${isRuleConflicted(rule.key) ? 'critical-input-conflict' : ''}`}
                           >
                             <div className={`w-4 h-4 bg-white rounded-full transition-all duration-300 ${
                               (rule.isThreshold ? (settings[rule.category!]?.[rule.key!] > 0) : settings[rule.category!]?.[rule.key!]) 
@@ -1426,8 +1636,8 @@ export default function SettingsPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest flex items-center">
+                <div className={`space-y-2 ${isFieldConflicted('max_spread_points') ? 'critical-field-wrap p-3 rounded-2xl' : ''}`}>
+                   <label className={`text-[10px] font-bold text-gray-400 uppercase ml-2 tracking-widest flex items-center ${isFieldConflicted('max_spread_points') ? 'critical-label-conflict' : ''}`}>
                      Spread Máximo (Pontos)
                      <InfoTooltip title={SETTINGS_HELP.max_spread.title} content={SETTINGS_HELP.max_spread.content} />
                    </label>
@@ -1436,7 +1646,7 @@ export default function SettingsPage() {
                       type="number"
                       value={settings.signal_logic?.max_spread_points || 30}
                       onChange={(e) => updateNested('signal_logic', 'max_spread_points', parseInt(e.target.value))}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-orange-500"
+                      className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-orange-500 ${isFieldConflicted('max_spread_points') ? 'critical-input-conflict' : ''}`}
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 tracking-tighter uppercase">Pts</span>
                    </div>

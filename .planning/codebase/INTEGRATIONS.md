@@ -1,21 +1,34 @@
-# Integrations
+﻿# Integrations
 
-O sistema integra múltiplos serviços e gateways para garantir operação em tempo real e entrega de dados.
+## MetaTrader 5
+- Conexao principal do robo via `mt5.initialize()` (`src/core/connection.py`, `src/main.py`).
+- API consulta ticks, candles e posicoes (`src/analysis/signals.py`, `src/execution/orders.py`).
+- Endpoint de grafico exposto em `/api/chart/{symbol}` (`src/api/main.py`).
+- Dependencia operacional: terminal MT5 local logado e com algo trading habilitado.
 
-## MetaTrader 5 (MT5)
-- **Tipo**: Integração Nativa via Python.
-- **Função**: Execução de ordens, monitoramento de conta (Balance, Equity) e streaming de ticks/rates.
-- **Conectividade**: Local (Windows) com terminal MT5 aberto.
+## MySQL
+- Persistencia com pool de conexoes (`src/core/database.py`).
+- Tabelas principais: `trades`, `system_logs`, `settings_snapshots`, `notification_events`.
+- Credenciais padrao usadas em API e DB manager (`src/api/main.py`, `src/core/database.py`).
+- Infra local via container `mysql-db` em `docker-compose.yml`.
 
-## Web Dashboard <-> Backend API
-- **Protocolo**: REST (JSON) em rede local/containerizada.
-- **Sincronização**: Hot-Reload de parâmetros operacionais via API FastAPI.
-- **Visualização**: Streaming de `runtime_snapshot` para monitoramento de ciclos.
+## Next.js <-> FastAPI
+- Frontend consome API via `NEXT_PUBLIC_API_URL` com fallback `http://localhost:8000`.
+- Endpoints usados: `/login`, `/status`, `/runtime`, `/settings`, `/metrics`, `/api/performance`, `/logs`.
+- Modulo de notificacoes usa `/notifications*` para listagem, leitura, limpeza e teste.
+- Chamadas autenticadas por bearer token armazenado no cliente (`web-dashboard/src/app/*`).
 
-## TradingView Charts
-- **Tipo**: Client-side Integration.
-- **Função**: Renderização técnica de velas M1 e projeções de níveis A/B/Alvos diretamente no navegador.
+## Telegram
+- Canal de entrega de alertas em `src/notifications/providers.py`.
+- URL alvo: `https://api.telegram.org/bot<token>/sendMessage`.
+- Politica de supressao e rate control em `src/notifications/policy.py` e `src/notifications/service.py`.
+- Configuracoes ficam no payload `notifications.telegram` em `settings.json`.
 
-## Provedores de Notificação (Pipeline)
-- **Providers**: Telegram / Email (via `src/notifications/providers.py`).
-- **Função**: Alertas operacionais, gatilhos de segurança e relatórios de performance.
+## Processos locais e SO
+- API inicia/paralisa engine por subprocess (`src/api/main.py`, rotas `/start` e `/stop`).
+- Em Windows, encerramento usa `taskkill /PID /T /F`.
+- `run_system.bat` integra Docker, instalacao pip e bootstrap da API.
+
+## Observacoes de integracao
+- CORS da API esta aberto para todas as origens (`allow_origins=["*"]`).
+- Existe fluxo legada de dashboard Streamlit lendo arquivos locais e banco diretamente (`src/ui/dashboard.py`).

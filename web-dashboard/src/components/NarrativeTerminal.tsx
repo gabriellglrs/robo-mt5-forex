@@ -43,6 +43,23 @@ const BLOCK_REASON_HINTS: Record<string, string> = {
   'FIM-016': 'confluencia estrutural (topos/fundos) ainda nao confirmou.',
 };
 
+const PENDING_REASON_HINTS: Record<string, string> = {
+  'FIM-001': 'coleta de dados ainda em andamento para fechar leitura minima.',
+  'FIM-002': 'mercado ainda nao confirmou direcao dominante.',
+  'FIM-003': 'estrutura A/B ainda esta em formacao/validacao.',
+  'FIM-005': 'preco ainda nao entrou na regiao negociavel.',
+  'FIM-006': 'agrupamento no timeframe de entrada ainda nao fechou criterio.',
+  'FIM-007': 'rompimento com buffer ainda nao confirmou.',
+  'FIM-008': 'validacao anti-achometro ainda nao completou confluencia.',
+  'FIM-009': 'filtro de spread ainda aguardando leitura final do ciclo.',
+  'FIM-010': 'ciclo de protecao fica pendente ate existir posicao ativa.',
+  'FIM-011': 'reteste (pullback) ainda nao confirmou janela tecnica.',
+  'FIM-012': 'limite de risco so valida totalmente no momento de execucao.',
+  'FIM-013': 'gestao de alvos depende da confirmacao de entrada ativa.',
+  'FIM-015': 'reversao rigorosa ainda sem todos os requisitos tecnicos.',
+  'FIM-016': 'topos/fundos ainda aguardando confirmacao estrutural.',
+};
+
 interface NarrativeTerminalProps {
   assetRuntime?: RuntimeAssetExt;
   recentEvents?: RuntimeEvent[];
@@ -80,6 +97,18 @@ function mapLogType(level?: string): NarrativeMessage['type'] {
   return 'log';
 }
 
+function normalizeRuleStatus(status?: string): 'ok' | 'bloqueado' | 'desativado' | 'pendente' {
+  if (status === 'ok' || status === 'bloqueado' || status === 'desativado') return status;
+  return 'pendente';
+}
+
+function ruleStatusType(status: 'ok' | 'bloqueado' | 'desativado' | 'pendente'): NarrativeMessage['type'] {
+  if (status === 'ok') return 'success';
+  if (status === 'bloqueado') return 'error';
+  if (status === 'desativado') return 'log';
+  return 'warning';
+}
+
 function buildAiNarrative(asset: RuntimeAssetExt): Array<{ text: string; type: NarrativeMessage['type'] }> {
   const rule = asset.rule_id || 'FIM-014';
   const status = asset.status_text || 'Monitorando setup.';
@@ -90,9 +119,10 @@ function buildAiNarrative(asset: RuntimeAssetExt): Array<{ text: string; type: N
   const blockedFromTrace = Object.entries(asset.rule_trace || {}).find(([, status]) => status === 'bloqueado')?.[0];
   const blockedRule = asset.rule_id || blockedFromTrace;
   const blockedHint = blockedRule ? BLOCK_REASON_HINTS[blockedRule] : undefined;
+  const activeRuleStatus = normalizeRuleStatus(asset.rule_trace?.[rule]);
 
   const lines: Array<{ text: string; type: NarrativeMessage['type'] }> = [
-    { text: `Regra ativa: ${rule}`, type: 'ai' },
+    { text: `Regra ativa: ${rule} (${activeRuleStatus})`, type: ruleStatusType(activeRuleStatus) },
     { text: `Estado atual: ${status}`, type: 'info' },
     { text: `Leitura de tendencia: ${trend} em ${trendTf} | execucao em ${entryTf}`, type: 'ai' },
   ];
@@ -100,11 +130,26 @@ function buildAiNarrative(asset: RuntimeAssetExt): Array<{ text: string; type: N
   if (blockedRule && blockedHint) {
     lines.push({
       text: `Bloqueio ativo em ${blockedRule}: ${blockedHint}`,
-      type: 'warning',
+      type: 'error',
     });
     lines.push({
       text: `Para destravar ${blockedRule}: ${trigger}`,
-      type: 'info',
+      type: 'error',
+    });
+  } else if (activeRuleStatus === 'pendente') {
+    const pendingHint = PENDING_REASON_HINTS[rule] || 'condicao de mercado ainda em observacao.';
+    lines.push({
+      text: `${rule} pendente: ${pendingHint}`,
+      type: 'warning',
+    });
+    lines.push({
+      text: `Para validar ${rule}: ${trigger}`,
+      type: 'warning',
+    });
+  } else if (activeRuleStatus === 'desativado') {
+    lines.push({
+      text: `${rule} desativado: esta regra foi desligada nas configuracoes atuais.`,
+      type: 'log',
     });
   } else {
     lines.push({ text: `Acao corretiva: ${trigger}`, type: 'warning' });
@@ -115,7 +160,7 @@ function buildAiNarrative(asset: RuntimeAssetExt): Array<{ text: string; type: N
   } else if ((asset.open_positions || 0) > 0) {
     lines.push({ text: 'Posicao em curso sob gestao de risco.', type: 'info' });
   } else if (asset.reason === 'reversao_bloqueada' || asset.reason === 'fora_da_regiao_negociavel') {
-    lines.push({ text: 'Bloqueio tecnico ativo, sem permissao de entrada.', type: 'warning' });
+    lines.push({ text: 'Bloqueio tecnico ativo, sem permissao de entrada.', type: 'error' });
   }
 
   return lines;
@@ -162,6 +207,7 @@ function buildProximityHint(asset: RuntimeAssetExt): { text: string; type: Narra
 export default function NarrativeTerminal({ assetRuntime, recentEvents }: NarrativeTerminalProps) {
   const [messages, dispatch] = useReducer(messageReducer, []);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const aiTimeoutsRef = useRef<number[]>([]);
 
   const seenEventKeysRef = useRef<Set<string>>(new Set());
   const lastAiKeyRef = useRef<string>('');
@@ -185,6 +231,13 @@ export default function NarrativeTerminal({ assetRuntime, recentEvents }: Narrat
       },
     });
   }, [symbol]);
+
+  useEffect(() => {
+    return () => {
+      aiTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
+      aiTimeoutsRef.current = [];
+    };
+  }, []);
 
   // Runtime events -> terminal lines (event-driven, no duplication)
   useEffect(() => {
@@ -314,17 +367,30 @@ export default function NarrativeTerminal({ assetRuntime, recentEvents }: Narrat
     }
     lastHealthStateRef.current = healthState;
 
-    dispatch({
-      type: 'append',
-      items: [
-        ...aiLines.map((item, idx) => ({
-          id: `ai-${now}-${idx}`,
-          text: item.text,
-          type: item.type,
-          timestamp: new Date().toLocaleTimeString(),
-        })),
-        ...extraMessages,
-      ],
+    // Evita "rajada" de linhas: exibimos narrativa em cadencia curta sem atrasar o runtime.
+    aiTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
+    aiTimeoutsRef.current = [];
+
+    if (extraMessages.length > 0) {
+      dispatch({ type: 'append', items: extraMessages });
+    }
+
+    const stepMs = 1400;
+    aiLines.forEach((item, idx) => {
+      const timeoutId = window.setTimeout(() => {
+        dispatch({
+          type: 'append',
+          items: [
+            {
+              id: `ai-${Date.now()}-${idx}`,
+              text: item.text,
+              type: item.type,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ],
+        });
+      }, idx * stepMs);
+      aiTimeoutsRef.current.push(timeoutId);
     });
 
     prevPositionsRef.current = openPos;

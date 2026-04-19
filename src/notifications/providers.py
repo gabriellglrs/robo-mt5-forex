@@ -16,15 +16,20 @@ class TelegramProvider:
     def is_enabled(self) -> bool:
         return bool(self.bot_token and self.chat_id)
 
-    def send(self, text: str) -> dict:
+    def send(self, text: str, parse_mode: str = "MarkdownV2") -> dict:
         if not self.is_enabled():
             return {"ok": False, "error": "telegram_not_configured"}
 
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        
+        # Escaping for MarkdownV2 if needed
+        # Telegram MarkdownV2 requires escaping characters like _ * [ ] ( ) ~ ` > # + - = | { } . !
+        
         payload = json.dumps(
             {
                 "chat_id": self.chat_id,
                 "text": text,
+                "parse_mode": parse_mode,
                 "disable_web_page_preview": True,
             }
         ).encode("utf-8")

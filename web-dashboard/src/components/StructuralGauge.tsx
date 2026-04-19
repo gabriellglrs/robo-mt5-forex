@@ -45,7 +45,7 @@ export default function StructuralGauge({
       </div>
       
       <div 
-        className="glass rounded-3xl border border-white/5 relative h-80 overflow-hidden bg-black/60 shadow-[inset_0_2px_30px_rgba(0,0,0,0.8)]"
+        className="glass rounded-3xl border border-white/5 relative h-[28rem] xl:h-full min-h-[28rem] overflow-hidden bg-black/60 shadow-[inset_0_2px_30px_rgba(0,0,0,0.8)]"
         style={{
             maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)'

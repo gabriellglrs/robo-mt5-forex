@@ -7,22 +7,23 @@
         ],
         "history_years": 2,
         "wick_sensitivity": 0.3,
-        "trend_candles": 120,
-        "ab_lookback_candles": 40
+        "trend_candles": 40,
+        "ab_lookback_candles": 7
     },
     "signal_logic": {
         "trend_timeframe": "M15",
         "entry_timeframe": "M1",
         "breakout_buffer_points": 10,
+        "pullback_tolerance_points": 20,
         "trend_min_slope_points": 0.2,
         "sr_tolerance_points": 35,
         "require_grouping": true,
         "require_channel_break": true,
-        "require_sr_touch": true,
+        "require_sr_touch": false,
         "max_spread_points": 30,
-        "require_pullback_retest": true,
+        "require_pullback_retest": false,
         "strict_reversal_logic": true,
-        "require_structural_trend": true,
+        "require_structural_trend": false,
         "triangle_m1_candles": 5,
         "target_level_mode": "100",
         "trading_type": "scalper",
@@ -38,7 +39,7 @@
         "breakeven_trigger_points": 120,
         "breakeven_offset_points": 5,
         "fimathe_cycle_enabled": true,
-        "fimathe_management_mode": "infinity",
+        "fimathe_management_mode": "conservative",
         "fimathe_be_trigger_percent": 50,
         "fimathe_cycle_breakeven_offset_points": 10,
         "fimathe_trail_step_percent": 100
@@ -51,5 +52,22 @@
     "log_management": {
         "mode": "quantity",
         "value": 50
-    }
+    },
+    "notifications": {
+        "enabled": true,
+        "min_priority": "P2",
+        "categories": {
+            "execution": true,
+            "risk": true,
+            "health": true,
+            "setup": false
+        },
+        "telegram": {
+            "bot_token": "",
+            "chat_id": "",
+            "timeout_seconds": 2.5,
+            "retries": 2
+        }
+    },
+    "mt5_connection": {}
 }

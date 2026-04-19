@@ -1,19 +1,35 @@
-# Codebase Concerns
+﻿# Concerns
 
-Pontos de atenção, riscos técnicos e dívidas técnicas identificadas no estado atual do projeto.
+## Security and secrets
+- `SECRET_KEY` JWT hardcoded em `src/api/main.py`.
+- Usuario admin e hash fixos no codigo (`FAKE_USER` em `src/api/main.py`).
+- Credenciais MySQL hardcoded em API e database manager (`src/api/main.py`, `src/core/database.py`).
+- CORS liberado para qualquer origem (`allow_origins=["*"]` em `src/api/main.py`).
 
-## Performance & Latency
-- **MT5 Overhead**: A biblioteca MT5 oficial pode apresentar latência em buscas massivas de ticks. Solução: Cache agressivo de níveis e pooling de conexão.
-- **Refresh Rate**: Sincronia entre o ciclo de 1s do backend e a renderização do dashboard.
+## Operational risk
+- Forte dependencia do terminal MT5 local e ambiente Windows para operacao completa.
+- Controle de processo por PID/`taskkill` pode divergir se estado ficar desatualizado.
+- Arquivo de runtime JSON usado como fonte de verdade para UI pode sofrer corrida de escrita/leitura.
+- Duas UIs ativas (Next.js + Streamlit) aumentam risco de inconsistencias de comportamento.
 
-## Estratégia & Operacional
-- **Double Entries**: Risco de abrir múltiplas posições por símbolo se o MT5 demorar a reportar o `ticket`. Implementado mecanismo de bloqueio baseado em estado local.
-- **Lateralidade**: Fimathe purista pode gerar sinais falsos em canais extremamente estreitos. Implementada sensibilidade dinâmica (Phase 21).
-- **Stop Loss Reconciliação**: Garantir que o SL no MT5 sempre bata com a regra STI calculada no backend, mesmo após reinicialização.
+## Code quality debt
+- Arquivos gerados versionados no workspace (`__pycache__`, `.next`, `node_modules`) poluem exploracao e revisao.
+- TODO explicito em `src/main.py` para atualizar dinamicamente config do RiskManager.
+- Mistura de padroes de nomenclatura (pt/en) dificulta onboarding rapido.
+- Arquivos muito extensos (`src/main.py`, `src/ui/dashboard.py`, `src/api/main.py`) concentram multiplas responsabilidades.
 
-## Segurança & Resiliência
-- **API Security**: No momento, a API FastAPI opera sem autenticação robusta em rede local. Recomendado: Implementação de JWT/API Keys para exposição externa.
-- **Error Propagation**: Erros no MT5 (Market Closed, No Money) precisam de tratamento visual claro no dashboard para não deixar o usuário "no escuro".
+## Data and documentation drift
+- README raiz descreve PostgreSQL, mas implementacao real usa MySQL.
+- Partes do README do `web-dashboard` ainda estao no template padrao Next.js.
+- Existe risco de divergencia entre schema de settings da web e normalizacao backend.
 
-## Manutenibilidade
-- **Documentação de Lógica**: A complexidade do `fimathe_state_engine.py` exige documentação visual (Mermaid) para evitar regressões em regras FIM-001..008.
+## Testing and release risk
+- Ausencia de testes automatizados de API e frontend reduz confiabilidade em releases.
+- Integracoes externas (MT5/Telegram) sem suite de regressao deterministica.
+- Limpeza destrutiva de dados (`/maintenance/reset-data`, `/logs`) depende de protecao apenas por auth basica.
+
+## Priority recommendations
+- Mover segredos/credenciais para variaveis de ambiente imediatamente.
+- Fechar CORS por ambiente e reforcar auth (usuarios reais + refresh token/rotacao).
+- Dividir modulos grandes por dominio (engine loop, API handlers, dashboard streamlit).
+- Padronizar pipeline de testes para API, frontend e integracoes mockadas antes de proxima fase.

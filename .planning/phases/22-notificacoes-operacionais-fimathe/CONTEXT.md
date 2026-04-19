@@ -10,8 +10,10 @@ Implementar notificacoes operacionais do robo MT5 + Dashboard Web com foco em ev
 
 Escopo desta fase:
 - Motor de notificacoes (classificacao, deduplicacao, cooldown, agregacao).
-- Entrega inicial via Telegram.
+- Entrega inicial via Telegram com templates padronizados.
 - Exposicao de historico/estado de notificacoes para o frontend.
+- Redesenho Premium de todas as telas e cards de notificacao.
+- Refatoracao do Mapa de Niveis (Gauge) para formato Vertical com Preco Fixo centralizado.
 - Preferencias basicas de notificacao no Settings.
 
 Fora de escopo desta fase:
@@ -69,6 +71,8 @@ Fora de escopo desta fase:
 - Mensagens curtas, acionaveis e tecnicas.
 - Sempre incluir simbolo, lado, ticket e regra FIM quando aplicavel.
 - No monitor web, exibir "entregue" vs "suprimida por anti-spam" para auditoria.
+- Gauge Vertical: O preco fica fixo no centro (50% do eixo Y) e os niveis (A/B, Alvos, SL) se movem conforme o mercado.
+- Estetica Premium: Uso de framer-motion, glassmorphism e cores neon conforme o Design System Cockpit.
 
 </specifics>
 

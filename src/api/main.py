@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import sys
 
@@ -26,10 +26,17 @@ from pydantic import BaseModel
 
 from src.core.database import DatabaseManager
 from src.core.settings_schema import SettingsValidationError, validate_and_normalize_settings
+from src.notifications import NotificationService
+
+def ensure_mt5():
+    if not mt5.initialize():
+        # Tenta inicializar novamente se falhou
+        if not mt5.initialize():
+            return False
+    return True
 
 # --- INICIALIZACAO MT5 (GLOBAL PARA PERFORMANCE) ---
-if not mt5.initialize():
-    print(f"AVISO: Nao foi possivel inicializar o MT5 na API. Erro: {mt5.last_error()}")
+ensure_mt5()
 
 # --- CONFIGURACOES ---
 SETTINGS_FILE = os.path.join(PROJECT_ROOT, "config", "settings.json")
@@ -95,6 +102,12 @@ class RobotStatus(BaseModel):
 
 class SettingsUpdate(BaseModel):
     settings: dict
+
+class NotificationTestRequest(BaseModel):
+    message: Optional[str] = None
+    symbol: Optional[str] = None
+    priority: Optional[str] = "P2"
+    category: Optional[str] = "health"
 
 # --- AUXILIARES ---
 def _now_iso():
@@ -280,8 +293,89 @@ def get_notifications_metrics(user: str = Depends(get_current_user)):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
+
+@app.post("/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int, user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        updated = db.mark_notification_read(notification_id)
+        return {"updated": int(updated)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/notifications/read-all")
+def mark_notifications_read_all(user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        updated = db.mark_all_notifications_read()
+        return {"updated": int(updated)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/notifications/{notification_id}")
+def delete_notification(notification_id: int, user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        deleted = db.delete_notification(notification_id)
+        return {"deleted": int(deleted)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/notifications")
+def clear_notifications(user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        deleted = db.clear_notifications()
+        return {"deleted": int(deleted)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/notifications/test")
+def send_test_notification(payload: NotificationTestRequest, user: str = Depends(get_current_user)):
+    try:
+        settings = {}
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+
+        notifications_cfg = settings.get("notifications", {}) if isinstance(settings, dict) else {}
+        db = DatabaseManager()
+        notification_service = NotificationService(db_manager=db, config=notifications_cfg)
+
+        priority = str(payload.priority or "P2").upper()
+        if priority not in {"P1", "P2", "P3"}:
+            priority = "P2"
+
+        category = str(payload.category or "health").lower()
+        if category not in {"execution", "risk", "health", "setup"}:
+            category = "health"
+
+        message = (payload.message or "Teste manual de notificacao pela web dashboard.").strip()
+        event_payload = {
+            "event_type": "MANUAL_TEST",
+            "category": category,
+            "priority": priority,
+            "severity": "high" if priority == "P1" else "medium",
+            "message": message,
+            "symbol": (payload.symbol or None),
+            "rule_id": "FIM-TEST",
+            "metadata": {"source": "web_dashboard", "user": user},
+        }
+
+        result = notification_service.emit(event_payload)
+        return {"ok": True, "result": result}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 @app.get("/api/chart/{symbol}")
 def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current_user)):
+    if not ensure_mt5():
+        raise HTTPException(status_code=503, detail="MT5 Desconectado no Backend")
+    
     # Mapping timeframe string to MT5 timeframe constants
     timeframe_map = {
         "M1": mt5.TIMEFRAME_M1,
@@ -298,7 +392,12 @@ def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current
     rates = mt5.copy_rates_from_pos(symbol.upper(), mt5_tf, 0, 500)
     
     if rates is None or len(rates) == 0:
-        raise HTTPException(status_code=404, detail=f"Dados do ativo {symbol} nÃ£o acessÃ­veis. Certifique-se que estÃ¡ na observaÃ§Ã£o do mercado.")
+        # Tenta selecionar o simbolo se nao estiver visivel
+        mt5.symbol_select(symbol.upper(), True)
+        rates = mt5.copy_rates_from_pos(symbol.upper(), mt5_tf, 0, 500)
+        
+    if rates is None or len(rates) == 0:
+        raise HTTPException(status_code=404, detail=f"Dados do ativo {symbol} não acessíveis ou ativo inválido.")
         
     formatted_data = []
     for rate in rates:

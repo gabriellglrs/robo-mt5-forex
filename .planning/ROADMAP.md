@@ -1,4 +1,4 @@
-# Roadmap do Projeto: Robo MT5 v2
+﻿# Roadmap do Projeto: Robo MT5 v2
 
 ## Milestone 1: Base Operacional (Historico)
 - [x] Fases 1 a 6 concluidas (base de conexao, sinais, execucao, dashboard e comandos).
@@ -20,10 +20,10 @@
   - [x] Projecoes 50/80/85/100.
   - [x] Agrupamento no timeframe menor.
 
-- [x] **Phase 09: Gestão de Risco Fimathe**
-    - [x] Trava de segurança de 3% (Balance-based).
+- [x] **Phase 09: GestÃ£o de Risco Fimathe**
+    - [x] Trava de seguranÃ§a de 3% (Balance-based).
     - [x] Auto-trailing proativo (50% BE / 100% Lock).
-    - [x] Stop Técnico Inicial (STI) estrutural.
+    - [x] Stop TÃ©cnico Inicial (STI) estrutural.
 
 - [x] **Phase 10: UX e Configuracoes Completas**
   - [x] Todos os parametros da tecnica no painel.
@@ -67,120 +67,119 @@
 1. Todos os parametros da tecnica expostos na UI com ajuda em PT-BR.
 2. Painel de auditoria mostra regra ativa, estado atual e proximo gatilho.
 3. Fluxo runtime apresenta explicacao clara para entradas, bloqueios e ajustes de risco.
-4. Hot-reload de ativos permite mudar o monitoramento sem reiniciar o robô.
+4. Hot-reload de ativos permite mudar o monitoramento sem reiniciar o robÃ´.
 
-### Phase 12: Monitor de Execução Advanced UI/UX
-**Goal**: Transformar o monitor técnico em um dashboard premium com indicadores visuais, coloração semântica e rastreio explícito das regras Fimathe.
+### Phase 12: Monitor de ExecuÃ§Ã£o Advanced UI/UX
+**Goal**: Transformar o monitor tÃ©cnico em um dashboard premium com indicadores visuais, coloraÃ§Ã£o semÃ¢ntica e rastreio explÃ­cito das regras Fimathe.
 **Depends on**: Phase 10
 **Success Criteria**:
-1. Coloração semântica baseada na fase operacional (Monitoramento, Entrada, Risco).
-2. Card de Tendência com timeframe e ajuda didática para "pts".
-3. Simulação visual da estrutura técnica (Price vs Levels) em tempo real.
-4. Seção de Auditoria de Regras explicitando bloqueios/gatilhos (FIM-001..FIM-014).
+1. ColoraÃ§Ã£o semÃ¢ntica baseada na fase operacional (Monitoramento, Entrada, Risco).
+2. Card de TendÃªncia com timeframe e ajuda didÃ¡tica para "pts".
+3. SimulaÃ§Ã£o visual da estrutura tÃ©cnica (Price vs Levels) em tempo real.
+4. SeÃ§Ã£o de Auditoria de Regras explicitando bloqueios/gatilhos (FIM-001..FIM-014).
 
 Plans:
 - [x] TBD (run /gsd-plan-phase 12 to break down)
 
 ### Phase 13: Financial Transparency & Profit Monitoring
-**Goal**: Implementar monitoramento financeiro em tempo real com exibição de saldo, equidade e lucro flutuante (PnL) por ativo no dashboard.
+**Goal**: Implementar monitoramento financeiro em tempo real com exibiÃ§Ã£o de saldo, equidade e lucro flutuante (PnL) por ativo no dashboard.
 **Depends on**: Phase 12
 **Success Criteria**:
-1. Informações da conta (Saldo, Lucro Aberto) exibidas no cabeçalho do monitor.
-2. Cada card de ativo exibe seu lucro/prejuízo flutuante atual com coloração semântica.
-3. Dados financeiros integrados ao snapshot de runtime gerado pelo robô.
-4. Rebuild da infraestrutura Docker para suportar as mudanças de UI.
+1. InformaÃ§Ãµes da conta (Saldo, Lucro Aberto) exibidas no cabeÃ§alho do monitor.
+2. Cada card de ativo exibe seu lucro/prejuÃ­zo flutuante atual com coloraÃ§Ã£o semÃ¢ntica.
+3. Dados financeiros integrados ao snapshot de runtime gerado pelo robÃ´.
+4. Rebuild da infraestrutura Docker para suportar as mudanÃ§as de UI.
 
 Plans:
 - [x] **Phase 14: Rigorous Strategy Hardening (Full Alignment)**
-  - [x] Lógica de Reversão FIM-015 (2 níveis + 10-candle triangle).
-  - [x] Tendência Estrutural FIM-016 (Topos/Fundos).
-  - [x] Marcação A/B por Densidade/Consolidação.
-  - [x] Sincronização total com Web Dashboard.
+  - [x] LÃ³gica de ReversÃ£o FIM-015 (2 nÃ­veis + 10-candle triangle).
+  - [x] TendÃªncia Estrutural FIM-016 (Topos/Fundos).
+  - [x] MarcaÃ§Ã£o A/B por Densidade/ConsolidaÃ§Ã£o.
+  - [x] SincronizaÃ§Ã£o total com Web Dashboard.
 
 ### Phase 13: Financial Transparency & Profit Monitoring
-**Goal**: Implementar monitoramento financeiro em tempo real com exibição de saldo, equidade e lucro flutuante (PnL) por ativo no dashboard.
+**Goal**: Implementar monitoramento financeiro em tempo real com exibiÃ§Ã£o de saldo, equidade e lucro flutuante (PnL) por ativo no dashboard.
 **Depends on**: Phase 12
 **Success Criteria**:
-1. Informações da conta (Saldo, Lucro Aberto) exibidas no cabeçalho do monitor.
-2. Cada card de ativo exibe seu lucro/prejuízo flutuante atual com coloração semântica.
-3. Dados financeiros integrados ao snapshot de runtime gerado pelo robô.
-4. Rebuild da infraestrutura Docker para suportar as mudanças de UI.
+1. InformaÃ§Ãµes da conta (Saldo, Lucro Aberto) exibidas no cabeÃ§alho do monitor.
+2. Cada card de ativo exibe seu lucro/prejuÃ­zo flutuante atual com coloraÃ§Ã£o semÃ¢ntica.
+3. Dados financeiros integrados ao snapshot de runtime gerado pelo robÃ´.
+4. Rebuild da infraestrutura Docker para suportar as mudanÃ§as de UI.
 
 Plans:
 - [x] TBD (run /gsd-plan-phase 13 to break down)
 
 ### Phase 14: Rigorous Strategy Hardening (Full Alignment)
-**Goal**: Trazer o robô para 100% de conformidade com o documento FIMATHE-ESTRATEGIA.md, focando em endurecer as regras de entrada e reversão.
+**Goal**: Trazer o robÃ´ para 100% de conformidade com o documento FIMATHE-ESTRATEGIA.md, focando em endurecer as regras de entrada e reversÃ£o.
 **Depends on**: Phase 13
 **Success Criteria**:
-1. Regra FIM-015: Venda em tendência de alta só permitida após queda de 2 níveis + triângulo (10 velas M1).
-2. Regra FIM-016: Confirmação de tendência por Topos/Fundos ascendentes/descendentes.
-3. Regra FIM-003: Pontos A/B detectados por clusters de preço (densidade) em vez de picos isolados.
+1. Regra FIM-015: Venda em tendÃªncia de alta sÃ³ permitida apÃ³s queda de 2 nÃ­veis + triÃ¢ngulo (10 velas M1).
+2. Regra FIM-016: ConfirmaÃ§Ã£o de tendÃªncia por Topos/Fundos ascendentes/descendentes.
+3. Regra FIM-003: Pontos A/B detectados por clusters de preÃ§o (densidade) em vez de picos isolados.
 4. UI Dashboard: Expor novas regras e o toggle de "Alvo 85%" explicitado no material.
 
 Plans:
 - [x] [implementation_plan.md](file:///C:/Users/gabri/.gemini/antigravity/brain/21b9a612-2f90-40ef-9c62-575d69adcf67/implementation_plan.md) (Completed & Validated)
 
-### Phase 15: Excelência UX - Tooltips Inteligentes Fimathe
-**Goal**: Implementar tooltips premium (balões) sobre o ícone (i) com descrições ricas, propósito e impacto de ativação/desativação para as 16 regras.
+### Phase 15: ExcelÃªncia UX - Tooltips Inteligentes Fimathe
+**Goal**: Implementar tooltips premium (balÃµes) sobre o Ã­cone (i) com descriÃ§Ãµes ricas, propÃ³sito e impacto de ativaÃ§Ã£o/desativaÃ§Ã£o para as 16 regras.
 **Depends on**: Phase 14
 **Success Criteria**:
-1. Tooltips premium com framer-motion disparados pelo ícone (i).
-2. Descrições completas (Propósito + Impacto On/Off) para todas as regras.
+1. Tooltips premium com framer-motion disparados pelo Ã­cone (i).
+2. DescriÃ§Ãµes completas (PropÃ³sito + Impacto On/Off) para todas as regras.
 3. Design Glassmorphism + Neon alinhado ao tema Cockpit.
-4. Remoção da animação de hover antiga que obstruía os cards.
+4. RemoÃ§Ã£o da animaÃ§Ã£o de hover antiga que obstruÃ­a os cards.
 
-### Phase 16: Central de Educação (Fimathe Academy)
-**Goal**: Criar uma enciclopédia interativa (/academy) com explicações profundas de cada regra FIM, guias de configuração e dicas operacionais.
+### Phase 16: Central de EducaÃ§Ã£o (Fimathe Academy)
+**Goal**: Criar uma enciclopÃ©dia interativa (/academy) com explicaÃ§Ãµes profundas de cada regra FIM, guias de configuraÃ§Ã£o e dicas operacionais.
 **Depends on**: Phase 15
 **Success Criteria**:
 1. Nova rota `/academy` com layout estilo Wiki/Doc especializado.
-2. Artigos detalhados para todas as 16 regras (Motivação, Lógica e Consequências).
-3. Seção de "Dicas Pro" para configuração de filtros opcionais.
+2. Artigos detalhados para todas as 16 regras (MotivaÃ§Ã£o, LÃ³gica e ConsequÃªncias).
+3. SeÃ§Ã£o de "Dicas Pro" para configuraÃ§Ã£o de filtros opcionais.
 4. Deep-links dos tooltips das Settings para a Academy.
 
 ### Phase 17: Dashboard de Performance e Insights (BI)
-**Goal**: Transformar dados brutos de trades em inteligência de trading (Win Rate, Profit Factor, Drawdown, PnL por Ativo) em uma rota dedicada `/stats`.
+**Goal**: Transformar dados brutos de trades em inteligÃªncia de trading (Win Rate, Profit Factor, Drawdown, PnL por Ativo) em uma rota dedicada `/stats`.
 **Depends on**: Phase 14
 **Success Criteria**:
 1. Nova rota `/stats` (ou `/performance`) com visual premium de BI.
-2. Gráfico circular de Win Rate (Vitórias/Derrotas).
-3. Gráfico de barras de PnL agrupado por Ativo.
-4. KPIs principais: Profit Factor, Payoff e Drawdown Máximo calculados pelo Backend.
+2. GrÃ¡fico circular de Win Rate (VitÃ³rias/Derrotas).
+3. GrÃ¡fico de barras de PnL agrupado por Ativo.
+4. KPIs principais: Profit Factor, Payoff e Drawdown MÃ¡ximo calculados pelo Backend.
 
 ---
----
-**Status Atual**: Milestone 2 CONCLUÍDO. Conformidade Fimathe 100% Validada (FIM-001 até FIM-016) e Performance BI Entregue. Iniciando Milestone 3.
+**Status Atual**: Milestone 2 CONCLUÃDO. Conformidade Fimathe 100% Validada (FIM-001 atÃ© FIM-016) e Performance BI Entregue. Iniciando Milestone 3.
 
-## Milestone 3: Expansão Operacional & Conectividade (Ativo)
+## Milestone 3: ExpansÃ£o Operacional & Conectividade (Ativo)
 
-### Phase 18: Perfis de Operação e Presets (Fimathe Profiles) [DONE]
+### Phase 18: Perfis de OperaÃ§Ã£o e Presets (Fimathe Profiles) [DONE]
 **Goal**: Implementar presets que configuram automaticamente os timeframes de acordo com o perfil e adicionar selos visuais no monitor.
 **Depends on**: Phase 17
 **Success Criteria**: [COMPLETED]
 
 ### Phase 19: UX Educativo - Tooltips Globais
-**Goal**: Adicionar Tooltips explicativos em todas as configurações da dashboard para facilitar o entendimento técnico.
+**Goal**: Adicionar Tooltips explicativos em todas as configuraÃ§Ãµes da dashboard para facilitar o entendimento tÃ©cnico.
 **Depends on**: Phase 18
 **Success Criteria**:
-1. Ícone `(?)` em todos os campos de `/settings` (Analysis, Signal Logic, Risk, Connection, UI).
-2. Descrições detalhadas e didáticas baseadas na estratégia Fimathe para cada parâmetro.
-3. Componente de visualização padronizado e premium.
+1. Ãcone `(?)` em todos os campos de `/settings` (Analysis, Signal Logic, Risk, Connection, UI).
+2. DescriÃ§Ãµes detalhadas e didÃ¡ticas baseadas na estratÃ©gia Fimathe para cada parÃ¢metro.
+3. Componente de visualizaÃ§Ã£o padronizado e premium.
 
-### Phase 20: Stop Loss Estratégico (FIM-017, FIM-018) [COMPLETED]
-**Goal**: Implementar as novas regras de Stop Loss Purista (FIM-017 e FIM-018) para maior segurança e lucratividade.
+### Phase 20: Stop Loss EstratÃ©gico (FIM-017, FIM-018) [COMPLETED]
+**Goal**: Implementar as novas regras de Stop Loss Purista (FIM-017 e FIM-018) para maior seguranÃ§a e lucratividade.
 **Depends on**: Phase 19
 **Success Criteria**:
-1. Lógica FIM-017 implementada no motor de execução.
-2. Lógica FIM-018 implementada no motor de execução.
-3. Configurações visuais e tooltips adicionados para as novas regras.
+1. LÃ³gica FIM-017 implementada no motor de execuÃ§Ã£o.
+2. LÃ³gica FIM-018 implementada no motor de execuÃ§Ã£o.
+3. ConfiguraÃ§Ãµes visuais e tooltips adicionados para as novas regras.
 
 - [x] **Phase 21: Asset Deep Dive & Live Charting (Terminal de Batalha)**
-  - [x] Conexão MT5 (`copy_rates_from_pos`) escalonável.
+  - [x] ConexÃ£o MT5 (`copy_rates_from_pos`) escalonÃ¡vel.
   - [x] Componente `LiveChart.tsx` integrado com alto desempenho.
-  - [x] Sensibilidade dinâmica (Lookback 5+ velas).
-  - [x] Hot-Reload de parâmetros sem restart.
-  - [x] Correção de visibilidade em mercado lateral.
+  - [x] Sensibilidade dinÃ¢mica (Lookback 5+ velas).
+  - [x] Hot-Reload de parÃ¢metros sem restart.
+  - [x] CorreÃ§Ã£o de visibilidade em mercado lateral.
 
 ### Objetivo
 Registrar melhorias futuras da camada web, sem alterar o escopo atual do robo.
@@ -260,4 +259,41 @@ Registrar funcionalidades pendentes para uso operacional real do robo com MetaTr
 4. Entrega inicial via Telegram com templates padronizados por tipo de evento.
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 22 to break down)
+- [ ] [PLAN.md](file:///c:/DEV/robo-mt5-v2/.planning/phases/22-notificacoes-operacionais-fimathe/PLAN.md)
+
+### Phase 23: Strategy Lab Backtest Multi-Config por Ativo
+**Goal**: Implementar um laboratorio de backtest/replay para avaliar desempenho do robo por ativo, preset e configuracoes Fimathe em janelas de 2/7/14 dias.
+**Depends on**: Phase 22
+**Success Criteria**:
+1. Executar simulacoes historicas por ativo com o mesmo motor de decisao do runtime, sem lookahead bias.
+2. Comparar presets oficiais e variacoes criticas de configuracao com metricas consolidadas (PnL, win rate, payoff, PF, drawdown).
+3. Persistir execucoes e resultados no banco para consulta historica e ranking por ativo/configuracao.
+4. Disponibilizar rota/tela propria para disparo e analise de testes do laboratorio.
+
+Plans:
+- [ ] [PLAN.md](file:///c:/DEV/robo-mt5-v2/.planning/phases/23-strategy-lab-backtest-multi-config-por-ativo/PLAN.md)
+
+### Phase 24: Account Intelligence e Gestao Inteligente da Conta
+**Goal**: Criar uma rota/tela de gestao inteligente da conta para apoiar decisoes do usuario com base em desempenho por dia/semana/mes, regime de mercado por ativo e recomendacao de preset/configuracao.
+**Depends on**: Phase 23
+**Success Criteria**:
+1. Exibir saude operacional da conta com leitura temporal (dia/semana/mes) e principais riscos ativos.
+2. Ranquear ativos por oportunidade/aderencia da estrategia usando evidencias do laboratorio da Phase 23.
+3. Sugerir preset/configuracao por ativo com explicacao objetiva e rastreavel.
+4. Disponibilizar rota/tela propria para tomada de decisao do usuario (gestao de conta orientada a dados).
+
+Plans:
+- [ ] [PLAN.md](file:///c:/DEV/robo-mt5-v2/.planning/phases/24-account-intelligence-e-gestao-inteligente-da-conta/PLAN.md)
+### Phase 25: TDD Cobertura Robot + Backend + Web
+**Goal**: Estruturar uma camada pragmatica de TDD para validar configuracoes Fimathe, bloquear combinacoes conflitantes e reduzir regressao no fluxo monitor/settings/notificacoes.
+**Depends on**: Phase 22
+**Success Criteria**:
+1. Matriz minima de combinacoes invalidas formalizada com testes automatizados.
+2. Backend bloqueia configuracoes conflitantes com retorno estruturado por campo/cartao.
+3. Frontend destaca visualmente os pontos de conflito e impede salvar estado invalido.
+4. Acao de reset restaura configuracao oficial funcional sem efeitos colaterais.
+
+Plans:
+- [x] `.planning/phases/25-tdd-cobertura-robot-backend-web/PLAN.md`
+
+

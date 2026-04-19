@@ -56,6 +56,14 @@ export default function RuleGrid({ trace }: RuleGridProps) {
                 <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                 <span className="text-[8px] font-bold text-gray-500 uppercase">Block</span>
             </div>
+            <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="text-[8px] font-bold text-gray-500 uppercase">Wait</span>
+            </div>
+            <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                <span className="text-[8px] font-bold text-gray-500 uppercase">Off</span>
+            </div>
         </div>
       </div>
       
@@ -71,13 +79,22 @@ export default function RuleGrid({ trace }: RuleGridProps) {
           const id = `FIM-${(i + 1).toString().padStart(3, '0')}`;
           const status = normalizeStatus(trace?.[id]);
           const meta = RULE_METADATA[id];
+          const cardAlertClass =
+            status === 'bloqueado'
+              ? 'bg-red-500/10 border-red-500/35 shadow-[0_0_18px_rgba(239,68,68,0.22)] animate-pulse'
+              : status === 'pendente'
+                ? 'bg-amber-400/5 border-amber-400/20'
+                : status === 'desativado'
+                  ? 'bg-white/[0.02] border-white/5'
+                  : 'bg-primary/5 border-primary/20';
 
           return (
             <motion.div
               key={id}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="relative aspect-square glass rounded-xl border border-white/5 flex flex-col items-center justify-center cursor-help group"
+              className={`relative aspect-square glass rounded-xl border flex flex-col items-center justify-center cursor-help group transition-all duration-300 ${cardAlertClass}`}
+              style={status === 'bloqueado' ? { animationDuration: '2.6s' } : undefined}
               title={`${id}: ${meta.name}\n${status.toUpperCase()}: ${meta.desc}`}
             >
               <div className={`w-2 h-2 rounded-full mb-1.5 transition-all duration-500 ${getStatusColor(status)} ${status === 'bloqueado' ? 'animate-pulse' : ''}`} />

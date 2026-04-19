@@ -42,21 +42,68 @@ class NotificationService:
         return PRIORITY_RANK.get(priority, 99) <= PRIORITY_RANK.get(self.min_priority, 99)
 
     @staticmethod
-    def _render_message(event: dict) -> str:
-        tags = [event["priority"], event["event_type"]]
-        base = f"[{'|'.join(tags)}] {event['message']}"
-        details = []
-        if event.get("symbol"):
-            details.append(f"symbol={event['symbol']}")
-        if event.get("ticket"):
-            details.append(f"ticket={event['ticket']}")
-        if event.get("side"):
-            details.append(f"side={event['side']}")
-        if event.get("rule_id"):
-            details.append(f"rule={event['rule_id']}")
+    def _escape_markdown(text: str) -> str:
+        """Escapa caracteres especiais para o formato MarkdownV2 do Telegram."""
+        if not text:
+            return ""
+        # Lista de caracteres que devem ser escapados
+        escape_chars = r'_*[]()~`>#+-=|{}.!'
+        return "".join(f"\\{c}" if c in escape_chars else c for c in text)
+
+    def _render_message(self, event: dict) -> str:
+        """Renderiza mensagem premium com formatação MarkdownV2."""
+        emoji_map = {
+            "ENGINE_STARTED": "🤖",
+            "ENGINE_STOPPED": "💤",
+            "MT5_RECONNECTED": "📡",
+            "MT5_DISCONNECTED": "🚨",
+            "ORDER_OPENED": "🚀",
+            "ORDER_CLOSED": "🏁",
+            "TRAILING_UPDATE": "🛡️",
+            "RISK_ALERT": "⚠️",
+            "MANUAL_TEST": "🧪",
+        }
+        
+        event_type = event.get("event_type", "UNKNOWN")
+        emoji = emoji_map.get(event_type, "🔔")
+        
+        # Header
+        header = f"{emoji} *{self._escape_markdown(event_type.replace('_', ' '))}*"
+        
+        # Symbol / Side information
+        symbol = event.get("symbol")
+        side = event.get("side")
+        symbol_line = f"Asset: `{self._escape_markdown(symbol)}`" if symbol else ""
+        if side:
+            symbol_line += f" | Side: `{self._escape_markdown(side)}`"
+            
+        # Message body
+        body = self._escape_markdown(event.get("message", ""))
+        
+        # Technical values
+        tech = []
         if event.get("price") is not None:
-            details.append(f"price={event['price']:.5f}")
-        return f"{base}\n" + " ".join(details) if details else base
+            tech.append(f"Price: `{event['price']:.5f}`")
+        if event.get("rule_id"):
+            tech.append(f"Rule: `{self._escape_markdown(event['rule_id'])}`")
+        if event.get("ticket"):
+            tech.append(f"Ticket: `#{event['ticket']}`")
+            
+        # Compile final message
+        lines = [header]
+        if symbol_line:
+            lines.append(symbol_line)
+        lines.append("---")
+        lines.append(body)
+        if tech:
+            lines.append(" ".join(tech))
+        
+        # Footer / Metadata extras (like Target levels)
+        md = event.get("metadata", {})
+        if md.get("projection_100"):
+            lines.append(f"Target 100%: `{float(md['projection_100']):.5f}`")
+            
+        return "\n".join(lines)
 
     def _save(self, record: dict):
         if not self.db:

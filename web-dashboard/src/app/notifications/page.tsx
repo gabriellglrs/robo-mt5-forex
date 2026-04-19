@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell,
   Volume2,
@@ -12,6 +13,8 @@ import {
   ShieldAlert,
   Filter,
   RefreshCw,
+  Clock,
+  Zap,
 } from "lucide-react";
 
 type NotificationItem = {
@@ -42,10 +45,16 @@ function formatDateTime(value?: string) {
   if (!value) return "--";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString("pt-BR");
+  return parsed.toLocaleString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
-function eventTone(item: NotificationItem): "red" | "green" | "orange" {
+function eventTone(item: NotificationItem): "red" | "green" | "orange" | "cyan" {
   const event = String(item.event_type || "").toUpperCase();
   const msg = String(item.message || "").toUpperCase();
   const status = String(item.status || "").toLowerCase();
@@ -71,6 +80,7 @@ function eventTone(item: NotificationItem): "red" | "green" | "orange" {
     if (msg.includes("-")) return "red";
     return "orange";
   }
+  if (event.includes("TEST") || event.includes("ENGINE_STARTED")) return "cyan";
   return item.category === "risk" ? "orange" : "green";
 }
 
@@ -112,7 +122,7 @@ export default function NotificationsPage() {
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.2);
     } catch {
-      // Sem ação: alguns browsers bloqueiam áudio sem gesto do usuário.
+      // Ignored
     }
   };
 
@@ -151,7 +161,7 @@ export default function NotificationsPage() {
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      if (firstLoad) setLoading(false);
     }
   };
 
@@ -200,10 +210,10 @@ export default function NotificationsPage() {
       });
       setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setMetrics((prev) => ({ ...prev, unread_count: 0 }));
-      setToast("Todas as notificações foram marcadas como lidas.");
+      setToast("Sucesso: Todas as notificações marcadas como lidas.");
     } finally {
       setBusy(false);
-      setTimeout(() => setToast(null), 2200);
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -216,14 +226,13 @@ export default function NotificationsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setItems((prev) => prev.filter((n) => n.id !== id));
-      fetchNotifications(false);
     } catch (error) {
       console.error(error);
     }
   };
 
   const clearAll = async () => {
-    if (!window.confirm("Excluir TODAS as notificações? Esta ação não pode ser desfeita.")) return;
+    if (!window.confirm("CONFIRMAÇÃO CRÍTICA: Deseja apagar permanentemente todas as notificações?")) return;
     const token = localStorage.getItem("token");
     if (!token) return;
     setBusy(true);
@@ -234,10 +243,10 @@ export default function NotificationsPage() {
       });
       setItems([]);
       setMetrics({ total: 0, unread_count: 0, emitted: 0, suppressed: 0, delivery_failed: 0 });
-      setToast("Todas as notificações foram removidas.");
+      setToast("Banco de notificações limpo com sucesso.");
     } finally {
       setBusy(false);
-      setTimeout(() => setToast(null), 2200);
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -253,159 +262,253 @@ export default function NotificationsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: "Teste manual de notificacao disparado pelo painel.",
+          message: "⚠️ Teste de Central: Verificação de latência e prioridade.",
           category: "health",
           priority: "P2",
         }),
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       await fetchNotifications(false);
-      setToast("Notificacao de teste enviada.");
+      setToast("Teste disparado! Verifique a lista.");
     } catch (error) {
       console.error(error);
-      setToast("Falha ao enviar notificacao de teste.");
+      setToast("Erro ao processar teste.");
     } finally {
       setSendingTest(false);
-      setTimeout(() => setToast(null), 2200);
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Bell className="w-5 h-5 text-primary" />
-            <span className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">Central de Alertas</span>
+      {/* HEADER SECTION - COCKPIT STYLE */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--color-primary),0.8)]" />
+            <span className="text-primary text-[10px] font-black uppercase tracking-[0.3em]">Transparência Operacional</span>
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tighter">
-            NOTIFICAÇÕES <span className="text-primary">EM TEMPO REAL</span>
+          <h1 className="text-5xl font-black text-white tracking-tighter leading-none italic">
+            CENTRAL DE <span className="text-primary NOT-italic">ALERTAS</span>
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Entrada, stop, break-even, erros e eventos críticos do robô.</p>
+          <p className="text-gray-500 text-sm font-medium border-l-2 border-primary/20 pl-4 py-1">
+            Monitoramento em tempo real de execução, riscos e integridade do sistema.
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
           <button
             onClick={() => setSoundEnabled((v) => !v)}
-            className="glass px-4 py-2 rounded-xl text-xs font-black text-white border border-white/10 hover:border-primary/30 transition-all flex items-center gap-2"
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-red-400" />}
-            {soundEnabled ? "Som Ligado" : "Som Mutado"}
-          </button>
-          <button onClick={markAllRead} disabled={busy} className="glass px-4 py-2 rounded-xl text-xs font-black text-white border border-white/10 hover:border-green-400/30 transition-all flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-green-400" /> Marcar Todas Lidas
-          </button>
-          <button onClick={clearAll} disabled={busy} className="glass px-4 py-2 rounded-xl text-xs font-black text-white border border-red-500/30 hover:bg-red-500/10 transition-all flex items-center gap-2">
-            <Trash2 className="w-4 h-4 text-red-400" /> Limpar Tudo
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="glass rounded-2xl p-5 border border-white/10"><p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Total</p><p className="text-2xl font-black text-white">{metrics.total}</p></div>
-        <div className="glass rounded-2xl p-5 border border-primary/30 bg-primary/5"><p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Não Lidas</p><p className="text-2xl font-black text-primary">{metrics.unread_count}</p></div>
-        <div className="glass rounded-2xl p-5 border border-green-500/20"><p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Emitidas</p><p className="text-2xl font-black text-green-400">{metrics.emitted}</p></div>
-        <div className="glass rounded-2xl p-5 border border-red-500/20"><p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Falha Entrega</p><p className="text-2xl font-black text-red-400">{metrics.delivery_failed}</p></div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {[
-          { id: "all", label: "Todas" },
-          { id: "unread", label: "Não Lidas" },
-          { id: "critical", label: "Críticas" },
-        ].map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id as "all" | "unread" | "critical")}
-            className={`px-4 py-2 rounded-xl text-xs font-black border transition-all flex items-center gap-2 ${
-              filter === f.id ? "bg-primary text-black border-primary" : "glass text-gray-300 border-white/10"
+            className={`glass px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border ${
+              soundEnabled ? "border-primary/20 text-white hover:border-primary/50" : "border-red-500/20 text-red-400"
             }`}
           >
-            <Filter className="w-3 h-3" /> {f.label}
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-red-500" />}
+            {soundEnabled ? "Áudio ON" : "Áudio OFF"}
           </button>
-        ))}
-        <button onClick={() => fetchNotifications(false)} className="glass px-4 py-2 rounded-xl text-xs font-black text-gray-300 border border-white/10 flex items-center gap-2">
-          <RefreshCw className="w-3 h-3" /> Atualizar
-        </button>
-        <button
-          onClick={sendTestNotification}
-          disabled={sendingTest}
-          className="glass px-4 py-2 rounded-xl text-xs font-black text-white border border-cyan-400/30 hover:bg-cyan-500/10 transition-all flex items-center gap-2 disabled:opacity-60"
-        >
-          <Bell className="w-3 h-3 text-cyan-300" /> {sendingTest ? "Enviando..." : "Enviar Teste"}
-        </button>
+          <button 
+            onClick={markAllRead} 
+            disabled={busy} 
+            className="glass px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/5 hover:border-green-500/40 hover:bg-green-500/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <CheckCircle2 className="w-4 h-4 text-green-400" /> Marcar Lidas
+          </button>
+          <button 
+            onClick={clearAll} 
+            disabled={busy} 
+            className="glass px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/5 hover:border-red-500/40 hover:bg-red-500/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4 text-red-400" /> Limpar Tudo
+          </button>
+          <button
+            onClick={sendTestNotification}
+            disabled={sendingTest}
+            className="glass px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white border border-white/5 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Zap className={`w-4 h-4 text-cyan-400 ${sendingTest ? "animate-spin" : ""}`} /> Log Teste
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center p-20">
-          <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredItems.map((item) => {
-            const tone = eventTone(item);
-            const toneClasses =
-              tone === "red"
-                ? "border-red-500/30 bg-red-950/20"
-                : tone === "orange"
-                ? "border-orange-500/30 bg-orange-950/20"
-                : "border-green-500/30 bg-green-950/20";
-            return (
-              <div
-                key={item.id}
-                className={`glass p-5 rounded-2xl border ${toneClasses} ${item.is_read ? "opacity-75" : ""}`}
-                onClick={() => {
-                  if (!item.is_read) markRead(item.id);
-                }}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {tone === "red" ? (
-                        <ShieldAlert className="w-4 h-4 text-red-300" />
-                      ) : tone === "orange" ? (
-                        <AlertTriangle className="w-4 h-4 text-orange-300" />
-                      ) : (
-                        <CheckCircle2 className="w-4 h-4 text-green-300" />
-                      )}
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">{item.priority || "P2"}</span>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{item.event_type || "EVENT"}</span>
-                      {!item.is_read && <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary text-black font-black">NOVA</span>}
-                    </div>
-                    <p className="text-sm text-white font-semibold leading-relaxed">{item.message || "Sem mensagem."}</p>
-                    <p className="text-[11px] text-gray-400">
-                      {item.symbol ? `${item.symbol} • ` : ""}
-                      {item.side ? `${item.side} • ` : ""}
-                      {item.category || "setup"} • {formatDateTime(item.created_at)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteOne(item.id);
-                    }}
-                    className="p-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    title="Excluir notificação"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-          {filteredItems.length === 0 && (
-            <div className="glass p-10 rounded-2xl border border-white/10 text-center text-gray-400 text-sm">
-              Nenhuma notificação encontrada para este filtro.
+      {/* METRICS GRID - NEON CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total de Alertas", value: metrics.total, color: "gray" },
+          { label: "Não Lidas", value: metrics.unread_count, color: "primary", glow: true },
+          { label: "Transmitidas", value: metrics.emitted, color: "green" },
+          { label: "Erros de Entrega", value: metrics.delivery_failed, color: "red" },
+        ].map((m, i) => (
+          <div key={i} className={`glass rounded-2xl p-6 border relative overflow-hidden group transition-all duration-500 ${
+            m.color === 'primary' ? 'border-primary/40 bg-primary/5' : 
+            m.color === 'green' ? 'border-green-500/20' : 
+            m.color === 'red' ? 'border-red-500/20' : 'border-white/5'
+          }`}>
+             <div className="relative z-10">
+              <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em] mb-1">{m.label}</p>
+              <p className={`text-4xl font-black italic tracking-tighter ${
+                m.color === 'primary' ? 'text-primary' : 
+                m.color === 'green' ? 'text-green-400' : 
+                m.color === 'red' ? 'text-red-500' : 'text-white'
+              }`}>{m.value}</p>
             </div>
-          )}
+            {m.glow && <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 blur-[40px] rounded-full -mr-12 -mt-12 group-hover:bg-primary/20 transition-all" />}
+          </div>
+        ))}
+      </div>
+
+      {/* FILTER TABS & LIST */}
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 bg-black/40 p-1 rounded-2xl border border-white/5">
+            {[
+              { id: "all", label: "Registro Geral" },
+              { id: "unread", label: "Novos Alertas" },
+              { id: "critical", label: "Alta Prioridade" },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id as any)}
+                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                  filter === f.id ? "bg-primary text-black" : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={() => fetchNotifications(false)} 
+            className="group flex items-center gap-2 text-gray-500 hover:text-primary transition-all text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border border-transparent hover:border-primary/20"
+          >
+            <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-all duration-500" /> Sincronizar
+          </button>
         </div>
-      )}
+
+        {loading ? (
+          <div className="py-32 flex flex-col items-center justify-center space-y-4">
+            <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            <p className="text-[10px] font-black uppercase text-primary/60 tracking-[0.3em] animate-pulse">Estabelecendo Conexão...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 relative">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {filteredItems.map((item) => {
+                const tone = eventTone(item);
+                const isCritical = tone === 'red' || item.priority === 'P1';
+                
+                return (
+                  <motion.div
+                    key={item.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    className={`group relative glass rounded-2xl border-l-[6px] border transition-all duration-300 ${
+                      item.is_read ? "opacity-60 grayscale-[0.4]" : "hover:border-primary/40 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)]"
+                    } ${
+                      tone === "red" ? "border-red-500/50 bg-red-950/5 border-white/5" : 
+                      tone === "orange" ? "border-orange-500/50 bg-orange-950/5 border-white/5" : 
+                      tone === "cyan" ? "border-cyan-500/50 bg-cyan-900/5 border-white/5" :
+                      "border-green-500/50 bg-green-950/5 border-white/5"
+                    }`}
+                    onClick={() => !item.is_read && markRead(item.id)}
+                  >
+                    <div className="p-5 flex items-start justify-between gap-6 cursor-pointer">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg bg-black/40 ${
+                            tone === 'red' ? 'text-red-400' : 
+                            tone === 'orange' ? 'text-orange-400' : 
+                            tone === 'cyan' ? 'text-cyan-400' : 'text-green-400'
+                          }`}>
+                            {tone === 'red' ? <ShieldAlert className="w-4 h-4" /> : 
+                             tone === 'orange' ? <AlertTriangle className="w-4 h-4" /> : 
+                             tone === 'cyan' ? <Zap className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${
+                              tone === 'red' ? 'text-red-400' : 
+                              tone === 'orange' ? 'text-orange-400' : 
+                              tone === 'cyan' ? 'text-cyan-400' : 'text-green-400'
+                            }`}>
+                              {item.priority || "P2"} / {item.event_type?.replace('_', ' ') || "SISTEMA"}
+                            </span>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500 font-bold uppercase">
+                              <Clock className="w-3 h-3" /> {formatDateTime(item.created_at)}
+                            </div>
+                          </div>
+                          {!item.is_read && (
+                            <div className="px-2.5 py-0.5 rounded-full bg-primary text-black text-[8px] font-black uppercase ml-2 animate-bounce">
+                              AO VIVO
+                            </div>
+                          )}
+                        </div>
+
+                        <h3 className="text-sm md:text-md text-white font-bold tracking-tight leading-relaxed max-w-2xl">
+                          {item.message || "Sem dados de telemetria."}
+                        </h3>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                           {item.symbol && (
+                            <div className="bg-white/5 px-2 py-1 rounded text-[10px] text-gray-400 font-bold">
+                              ATIVO: <span className="text-white">{item.symbol}</span>
+                            </div>
+                          )}
+                           {item.side && (
+                            <div className="bg-white/5 px-2 py-1 rounded text-[10px] text-gray-400 font-bold">
+                              LADO: <span className={item.side === 'BUY' ? 'text-green-400' : 'text-red-400'}>{item.side}</span>
+                            </div>
+                          )}
+                          <div className="bg-white/5 px-2 py-1 rounded text-[10px] text-gray-400 font-bold">
+                            CAT: <span className="text-gray-200 uppercase">{item.category || "Geral"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteOne(item.id); }}
+                          className="p-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all border border-red-500/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+
+            {filteredItems.length === 0 && (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                className="glass p-20 rounded-2xl border border-white/5 text-center flex flex-col items-center space-y-4"
+              >
+                <div className="p-4 rounded-full bg-white/5">
+                  <Bell className="w-10 h-10 text-gray-700" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-white font-black uppercase tracking-widest text-[11px]">Sistema em Espera</p>
+                  <p className="text-gray-500 text-xs">Aguardando novos eventos telemétricos.</p>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+      </div>
 
       {toast && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[120] glass px-5 py-3 rounded-2xl border border-primary/30 text-xs font-black text-white">
-          {toast}
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[120] glass px-6 py-4 rounded-2xl border border-primary/40 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-3"
+        >
+          <div className="w-2 h-2 rounded-full bg-primary animate-ping" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-white">{toast}</span>
+        </motion.div>
       )}
     </div>
   );
