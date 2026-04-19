@@ -23,6 +23,7 @@ def _candles_fixture(rows: int = 420) -> pd.DataFrame:
             "high": high_price,
             "low": low_price,
             "close": close_price,
+            "tick_volume": np.full(rows, 100, dtype=int),
         }
     )
 
@@ -51,7 +52,19 @@ def test_replay_backtest_returns_metrics_with_breakdown():
     assert isinstance(trades, list)
 
 
-def test_run_matrix_backtest_is_sorted_by_score_desc():
+def test_run_matrix_backtest_is_sorted_by_score_desc(monkeypatch):
+    class _FakeExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc, tb):
+            return False
+        def map(self, fn, iterable):
+            return [fn(item) for item in iterable]
+
+    monkeypatch.setattr("src.analysis.strategy_lab.ProcessPoolExecutor", _FakeExecutor)
+
     candles = _candles_fixture()
     results = run_matrix_backtest(
         symbol="EURUSD",
@@ -65,3 +78,33 @@ def test_run_matrix_backtest_is_sorted_by_score_desc():
     assert len(results) >= 3
     scores = [float(item["metrics"]["score"]) for item in results]
     assert scores == sorted(scores, reverse=True)
+
+
+def test_replay_backtest_diagnostic_uses_correct_fim_mapping(monkeypatch):
+    class _BlockedDetector:
+        def __init__(self, symbol, config):
+            pass
+
+        def set_static_point(self, point):
+            pass
+
+        def set_static_data(self, timeframe, df):
+            pass
+
+        def evaluate_signal_details(self, current_price, levels, current_spread=0.0):
+            return {"signal": None, "reason": "fora_da_regiao_negociavel"}
+
+    monkeypatch.setattr("src.analysis.strategy_lab.SignalDetector", _BlockedDetector)
+
+    candles = _candles_fixture(rows=300)
+    metrics, trades = run_replay_backtest(
+        symbol="ETHUSD",
+        candles_df=candles,
+        config={"trend_candles": 120, "ab_lookback_candles": 80},
+        point_value=0.01,
+        spread_points=0.0,
+        slippage_points=0.0,
+    )
+
+    assert trades == []
+    assert "FIM-005" in str(metrics.get("diagnostic", ""))

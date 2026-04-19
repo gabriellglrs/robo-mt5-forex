@@ -4,7 +4,7 @@ import MetaTrader5 as mt5
 import numpy as np
 import pandas as pd
 
-from analysis.fimathe_state_engine import evaluate_state_machine, resolve_rule_meta
+from src.analysis.fimathe_state_engine import evaluate_state_machine, resolve_rule_meta
 
 
 class SignalDetector:
@@ -18,6 +18,19 @@ class SignalDetector:
         self.point = symbol_info.point if symbol_info and symbol_info.point else 0.00001
         self._frozen_projection_map = None
         self._frozen_projection_trend = None
+        
+        # Injeção de dados offline para backtest
+        self._static_dfs = {} 
+        self._static_point = None
+
+    def set_static_data(self, timeframe, df):
+        """Injeta dataframe estatico para evitar chamadas ao MT5."""
+        self._static_dfs[str(timeframe).upper()] = df
+
+    def set_static_point(self, point):
+        """Define o valor do ponto para calculos offline."""
+        self._static_point = float(point)
+        self.point = float(point)
 
     def _get_timeframe_code(self, tf_string):
         mapping = {
@@ -33,11 +46,18 @@ class SignalDetector:
         return mapping.get(str(tf_string).upper(), mt5.TIMEFRAME_M15)
 
     def _load_rates(self, timeframe, count):
+        tf_key = str(timeframe).upper()
+        if tf_key in self._static_dfs:
+            return self._static_dfs[tf_key]
+
         tf_code = self._get_timeframe_code(timeframe)
-        rates = mt5.copy_rates_from_pos(self.symbol, tf_code, 0, int(count))
-        if rates is None or len(rates) < 5:
+        try:
+            rates = mt5.copy_rates_from_pos(self.symbol, tf_code, 0, int(count))
+            if rates is None or len(rates) < 2:
+                return None
+            return pd.DataFrame(rates)
+        except:
             return None
-        return pd.DataFrame(rates)
 
     def get_nearest_level_distance_points(self, price, levels):
         if not levels:

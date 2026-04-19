@@ -1,4 +1,4 @@
-﻿# Roadmap do Projeto: Robo MT5 v2
+# Roadmap do Projeto: Robo MT5 v2
 
 ## Milestone 1: Base Operacional (Historico)
 - [x] Fases 1 a 6 concluidas (base de conexao, sinais, execucao, dashboard e comandos).
@@ -259,7 +259,7 @@ Registrar funcionalidades pendentes para uso operacional real do robo com MetaTr
 4. Entrega inicial via Telegram com templates padronizados por tipo de evento.
 
 Plans:
-- [ ] [PLAN.md](file:///c:/DEV/robo-mt5-v2/.planning/phases/22-notificacoes-operacionais-fimathe/PLAN.md)
+- [x] [PLAN.md](file:///c:/DEV/robo-mt5-v2/.planning/phases/22-notificacoes-operacionais-fimathe/PLAN.md)
 
 ### Phase 23: Strategy Lab Backtest Multi-Config por Ativo
 **Goal**: Implementar um laboratorio de backtest/replay para avaliar desempenho do robo por ativo, preset e configuracoes Fimathe em janelas de 2/7/14 dias.
@@ -271,7 +271,7 @@ Plans:
 4. Disponibilizar rota/tela propria para disparo e analise de testes do laboratorio.
 
 Plans:
-- [ ] [PLAN.md](file:///c:/DEV/robo-mt5-v2/.planning/phases/23-strategy-lab-backtest-multi-config-por-ativo/PLAN.md)
+- [x] [PLAN.md](file:///c:/DEV/robo-mt5-v2/.planning/phases/23-strategy-lab-backtest-multi-config-por-ativo/PLAN.md)
 
 ### Phase 24: Account Intelligence e Gestao Inteligente da Conta
 **Goal**: Criar uma rota/tela de gestao inteligente da conta para apoiar decisoes do usuario com base em desempenho por dia/semana/mes, regime de mercado por ativo e recomendacao de preset/configuracao.

@@ -6,14 +6,14 @@ from datetime import datetime
 
 import MetaTrader5 as mt5
 
-from analysis.levels import LevelDetector
-from analysis.signals import SignalDetector
-from core.connection import MT5Connection
-from core.database import DatabaseManager
-from execution.fimathe_cycle import evaluate_fimathe_cycle_event
-from execution.orders import OrderEngine
-from execution.risk import RiskManager
-from notifications import NotificationService
+from src.analysis.levels import LevelDetector
+from src.analysis.signals import SignalDetector
+from src.core.connection import MT5Connection
+from src.core.database import DatabaseManager
+from src.execution.fimathe_cycle import evaluate_fimathe_cycle_event
+from src.execution.orders import OrderEngine
+from src.execution.risk import RiskManager
+from src.notifications import NotificationService
 
 logging.basicConfig(
     level=logging.INFO,

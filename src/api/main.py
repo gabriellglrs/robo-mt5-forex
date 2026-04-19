@@ -202,9 +202,13 @@ def start_robot(user: str = Depends(get_current_user)):
     log_handle.write(f"\n\n[{_now_iso()}] === START REQUEST FROM API ===\n")
     log_handle.flush()
 
+    env = os.environ.copy()
+    env["PYTHONPATH"] = PROJECT_ROOT
+
     popen_args = {
         "args": [sys.executable, "-u", ROBOT_MAIN_FILE],
         "cwd": PROJECT_ROOT,
+        "env": env,
         "stdin": subprocess.DEVNULL,
         "stdout": log_handle,
         "stderr": subprocess.STDOUT,
@@ -426,6 +430,40 @@ def list_strategy_lab_runs(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.get("/lab/inventory")
+def get_lab_inventory(user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        items = db.list_lab_local_inventory()
+        return {"items": items}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/lab/sync-all")
+def sync_lab_data(user: str = Depends(get_current_user)):
+    try:
+        service = StrategyLabService(DatabaseManager())
+        results = service.sync_all_symbols(window_days=14)
+        return {"ok": True, "results": results}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/lab/inventory/{symbol}")
+def delete_lab_inventory_symbol(symbol: str, user: str = Depends(get_current_user)):
+    try:
+        db = DatabaseManager()
+        conn = db.pool.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM lab_local_data WHERE symbol = %s", (symbol.upper(),))
+        conn.commit()
+        conn.close()
+        return {"ok": True, "message": f"Cache de {symbol} removido."}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.get("/lab/runs/{run_id}")
 def get_strategy_lab_run_detail(run_id: int, user: str = Depends(get_current_user)):
     try:
@@ -452,6 +490,29 @@ def get_strategy_lab_ranking(
         service = StrategyLabService(DatabaseManager())
         ranking = service.ranking(symbol=symbol, window_days=window_days, preset_id=preset_id, limit=limit)
         return {"items": ranking}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/lab/runs/{run_id}")
+def delete_strategy_lab_run(run_id: int, user: str = Depends(get_current_user)):
+    try:
+        service = StrategyLabService(DatabaseManager())
+        success = service.delete_run(run_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Run nao encontrado ou falha ao deletar.")
+        return {"id": run_id, "deleted": True}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.delete("/lab/runs")
+def delete_all_strategy_lab_runs(user: str = Depends(get_current_user)):
+    try:
+        service = StrategyLabService(DatabaseManager())
+        success = service.delete_all()
+        return {"deleted": success, "message": "Historico do laboratorio limpo."}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -500,6 +561,19 @@ def export_strategy_lab_run(run_id: int, format: str = "json", user: str = Depen
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/api/mt5/symbols")
+def get_mt5_symbols(user: str = Depends(get_current_user)):
+    if not ensure_mt5():
+        raise HTTPException(status_code=503, detail="MT5 Desconectado no Backend")
+    
+    symbols = mt5.symbols_get()
+    if symbols is None:
+        return []
+        
+    # Only return symbols enabled in MarketWatch (more representative of what can be traded)
+    return [s.name for s in symbols if s.visible]
 
 
 @app.get("/api/chart/{symbol}")

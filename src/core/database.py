@@ -162,9 +162,21 @@ class DatabaseManager:
             pnl_points DOUBLE,
             result VARCHAR(12),
             config_hash VARCHAR(64),
+            rule_id VARCHAR(40) NULL,
+            entry_reason VARCHAR(120) NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (run_id) REFERENCES lab_runs(id) ON DELETE CASCADE,
             FOREIGN KEY (result_id) REFERENCES lab_results(id) ON DELETE CASCADE
+        )
+        """
+
+        lab_local_data_sql = """
+        CREATE TABLE IF NOT EXISTS lab_local_data (
+            symbol VARCHAR(20) NOT NULL,
+            timeframe VARCHAR(10) NOT NULL,
+            last_sync DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            candles_json LONGTEXT NOT NULL,
+            PRIMARY KEY (symbol, timeframe)
         )
         """
 
@@ -178,6 +190,7 @@ class DatabaseManager:
             cursor.execute(lab_runs_sql)
             cursor.execute(lab_results_sql)
             cursor.execute(lab_trades_sql)
+            cursor.execute(lab_local_data_sql)
             
             # Adiciona a coluna settings_id caso a tabela trades ja exista (migracao)
             try:
@@ -193,6 +206,14 @@ class DatabaseManager:
                 pass
             try:
                 cursor.execute("ALTER TABLE notification_events ADD COLUMN read_at DATETIME NULL")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE lab_trades ADD COLUMN rule_id VARCHAR(40) NULL")
+            except Exception:
+                pass
+            try:
+                cursor.execute("ALTER TABLE lab_trades ADD COLUMN entry_reason VARCHAR(120) NULL")
             except Exception:
                 pass
 
@@ -337,12 +358,18 @@ class DatabaseManager:
             if conn is not None:
                 conn.close()
 
-    def save_lab_trade(self, run_id: int, result_id: int, trade: Dict[str, Any]):
+    def save_lab_trade(self, run_id: int, result_id: int, trade: Any):
+        def read_field(name: str, default=None):
+            if isinstance(trade, dict):
+                return trade.get(name, default)
+            return getattr(trade, name, default)
+
         sql = """
         INSERT INTO lab_trades (
             run_id, result_id, symbol, side, entry_time, exit_time,
-            entry_price, exit_price, sl_price, tp_price, pnl_points, result, config_hash, created_at
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            entry_price, exit_price, sl_price, tp_price, pnl_points, result, config_hash,
+            rule_id, entry_reason, created_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         conn = None
         cursor = None
@@ -354,17 +381,19 @@ class DatabaseManager:
                 (
                     int(run_id),
                     int(result_id),
-                    trade.get("symbol"),
-                    trade.get("side"),
-                    trade.get("entry_time"),
-                    trade.get("exit_time"),
-                    trade.get("entry_price"),
-                    trade.get("exit_price"),
-                    trade.get("sl_price"),
-                    trade.get("tp_price"),
-                    trade.get("pnl_points"),
-                    trade.get("result"),
-                    trade.get("config_hash"),
+                    read_field("symbol"),
+                    read_field("side"),
+                    read_field("entry_time"),
+                    read_field("exit_time"),
+                    read_field("entry_price"),
+                    read_field("exit_price"),
+                    read_field("sl_price"),
+                    read_field("tp_price"),
+                    read_field("pnl_points"),
+                    read_field("result"),
+                    read_field("config_hash"),
+                    read_field("rule_id"),
+                    read_field("reason"),
                     datetime.now(),
                 ),
             )
@@ -459,6 +488,19 @@ class DatabaseManager:
                     else:
                         row[key.replace("_json", "")] = {}
             run["results"] = results
+            cursor.execute(
+                """
+                SELECT 
+                    id, run_id, result_id, symbol, side, entry_time, exit_time, 
+                    entry_price, exit_price, sl_price, tp_price, pnl_points, result, config_hash,
+                    rule_id, entry_reason, created_at
+                FROM lab_trades
+                WHERE run_id = %s
+                ORDER BY entry_time ASC
+                """,
+                (int(run_id),),
+            )
+            run["trades"] = cursor.fetchall() or []
             return run
         except Exception as exc:
             self.logger.error(f"Erro ao carregar detalhe do lab run {run_id}: {exc}")
@@ -514,6 +556,42 @@ class DatabaseManager:
                 cursor.close()
             if conn is not None:
                 conn.close()
+
+    def delete_lab_run(self, run_id: int) -> bool:
+        """Deleta um run do laboratório e limpa resultados/trades (via CASCADE)."""
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM lab_runs WHERE id = %s", (run_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as exc:
+            self.logger.error(f"Erro ao deletar lab run {run_id}: {exc}")
+            return False
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def delete_all_lab_runs(self) -> bool:
+        """Limpa todo o histórico do laboratório (RESETA TUDO)."""
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM lab_runs")
+            conn.commit()
+            return True
+        except Exception as exc:
+            self.logger.error(f"Erro ao limpar histórico do laboratório: {exc}")
+            return False
+        finally:
+            if cursor is not None: cursor.close()
+            if conn is not None: conn.close()
 
     def save_notification(self, event: dict):
         """Registra auditoria de notificacao emitida/suprimida."""
@@ -953,3 +1031,56 @@ class DatabaseManager:
         finally:
             cursor.close()
             conn.close()
+    def save_lab_local_data(self, symbol: str, timeframe: str, candles: List[Dict[str, Any]]):
+        """Salva ou atualiza os dados historicos locais para um ativo."""
+        query = """
+        INSERT INTO lab_local_data (symbol, timeframe, candles_json, last_sync)
+        VALUES (%s, %s, %s, NOW())
+        ON DUPLICATE KEY UPDATE 
+            candles_json = VALUES(candles_json),
+            last_sync = NOW()
+        """
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query, (symbol.upper(), timeframe.upper(), json.dumps(candles)))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar lab_local_data para {symbol}: {exc}")
+            return False
+
+    def get_lab_local_data(self, symbol: str, timeframe: str) -> Optional[Dict[str, Any]]:
+        """Busca dados historicos locais e timestamp do ultimo sync."""
+        query = "SELECT candles_json, last_sync FROM lab_local_data WHERE symbol = %s AND timeframe = %s"
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(query, (symbol.upper(), timeframe.upper()))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                return {
+                    "candles": json.loads(row["candles_json"]),
+                    "last_sync": row["last_sync"]
+                }
+            return None
+        except Exception as exc:
+            self.logger.error(f"Erro ao buscar lab_local_data para {symbol}: {exc}")
+            return None
+
+    def list_lab_local_inventory(self) -> List[Dict[str, Any]]:
+        """Lista todos os ativos que possuem cache local e seus status."""
+        query = "SELECT symbol, timeframe, last_sync, LENGTH(candles_json) as size_bytes FROM lab_local_data"
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            conn.close()
+            return rows
+        except Exception as exc:
+            self.logger.error(f"Erro ao listar inventario de dados: {exc}")
+            return []

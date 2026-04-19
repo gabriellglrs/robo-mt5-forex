@@ -3,9 +3,12 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+from concurrent.futures import ProcessPoolExecutor
+import os
 
 import numpy as np
 import pandas as pd
+from src.analysis.signals import SignalDetector
 
 
 OFFICIAL_PRESETS: Dict[str, Dict[str, Any]] = {
@@ -63,6 +66,8 @@ class LabTrade:
     pnl_points: float
     result: str
     config_hash: str
+    rule_id: Optional[str] = None
+    reason: Optional[str] = None
 
 
 def _safe_float(value: Any, fallback: float) -> float:
@@ -81,12 +86,47 @@ def estimate_bars_for_days(days: int, timeframe: str) -> int:
     tf = normalize_timeframe(timeframe)
     minutes = TIMEFRAME_TO_MINUTES[tf]
     bars = int((days * 1440) / minutes)
-    return max(120, min(10000, bars))
+    # Adicionamos +120 barras de padding para garantir o warmup da tendência
+    return max(120 + 120, min(10000, bars + 120))
 
 
 def config_hash(config: Dict[str, Any]) -> str:
     stable_json = json.dumps(config, sort_keys=True, ensure_ascii=True)
     return hashlib.sha256(stable_json.encode("utf-8")).hexdigest()[:16]
+
+
+def resample_to_timeframe(df: pd.DataFrame, target_tf: str) -> Optional[pd.DataFrame]:
+    """Converte o dataframe base (ex: M15) para o timeframe alvo (ex: H1)."""
+    if df.empty:
+        return None
+    
+    tf_map = {
+        "M1": "1min", "M5": "5min", "M15": "15min", "M30": "30min",
+        "H1": "60min", "H4": "240min", "D1": "1440min"
+    }
+    
+    freq = tf_map.get(target_tf)
+    if not freq:
+        return df # Fallback se não reconhecer
+        
+    # Precisamos de um index de tempo para o resample
+    working_df = df.copy()
+    if not isinstance(working_df.index, pd.DatetimeIndex):
+        if "time" in working_df.columns:
+            working_df.index = pd.to_datetime(working_df["time"])
+        else:
+            return df
+            
+    resampled = working_df.resample(freq).agg({
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "tick_volume": "sum",
+        "time": "first"
+    }).dropna()
+    
+    return resampled
 
 
 def build_strategy_variations(base_config: Dict[str, Any], include_pairwise: bool = True) -> List[Dict[str, Any]]:
@@ -108,6 +148,14 @@ def build_strategy_variations(base_config: Dict[str, Any], include_pairwise: boo
         ("require_structural_trend", [True, False]),
     ]
 
+    LABEL_MAP = {
+        "breakout_buffer_points": "Buffer",
+        "pullback_tolerance_points": "Reteste",
+        "risk_percent": "Risco",
+        "require_grouping": "Agrupamento",
+        "require_structural_trend": "Trend H1"
+    }
+
     for idx, variant in enumerate(list(variants)):
         if idx >= 3:
             break
@@ -115,7 +163,9 @@ def build_strategy_variations(base_config: Dict[str, Any], include_pairwise: boo
             for value in values[:2]:
                 cloned = dict(variant)
                 cloned[key] = value
-                cloned["preset_id"] = f"{variant.get('preset_id', 'CUSTOM')}-PW-{key}-{str(value).replace('.', '_')}"
+                label = LABEL_MAP.get(key, key)
+                val_str = "ON" if value is True else "OFF" if value is False else str(value)
+                cloned["preset_id"] = f"{variant.get('preset_id', 'CUSTOM')} • {label} [{val_str}]"
                 variants.append(cloned)
 
     deduped: Dict[str, Dict[str, Any]] = {}
@@ -179,9 +229,31 @@ def run_replay_backtest(
     equity_curve: List[float] = []
     running_equity = 0.0
     cfg_hash = config_hash(config)
+    
+    detector = SignalDetector(symbol, config)
+    detector.set_static_point(point_value)
+    
+    trend_tf = normalize_timeframe(config.get("trend_timeframe", "H1"))
+    entry_tf = normalize_timeframe(config.get("entry_timeframe", "M15"))
+    
+    # Pre-calcular niveis SR se houver (opcional)
+    sr_levels = [] # Pode ser expandido futuramente
+
+    WARMUP_BARS = 100
+    current_step = 0
+
+    # Auditoria de Bloqueio (Caso resulte em 0 trades)
+    blocker_stats: Dict[str, int] = {}
 
     for idx in range(max(lookback, trend_candles), len(candles)):
+        current_step += 1
         frame = candles.iloc[: idx + 1]
+        
+        # Gerar Dataframe de Tendência (H1 rasmpeled) e Entrada (M15 native)
+        # O detector espera esses nomes na cache estática
+        trend_df = resample_to_timeframe(frame, trend_tf)
+        entry_df = resample_to_timeframe(frame, entry_tf)
+        
         row = frame.iloc[-1]
         close_price = float(row["close"])
         high_price = float(row["high"])
@@ -192,29 +264,64 @@ def run_replay_backtest(
             side = open_trade["side"]
             sl_price = open_trade["sl_price"]
             tp_price = open_trade["tp_price"]
+            entry_price = open_trade["entry_price"]
+            
+            # --- Gestão de Trade Adiantada (Fimathe Pro) ---
+            target_pts = abs(tp_price - entry_price) / max(point_value, 1e-9)
+            be_trigger = _safe_float(config.get("be_trigger_percent", 50.0), 50.0)
+            drag_mode = int(config.get("drag_mode", 0)) # 0: None, 1: FIM-017, 2: FIM-018
+            gordurinha = _safe_float(config.get("gordurinha_points", 0.0), 0.0)
+            target_lock = _safe_float(config.get("target_lock_percent", 100.0), 100.0)
+
+            # Cálculo de progresso do trade
+            curr_dist = (high_price - entry_price if side == "BUY" else entry_price - low_price) / max(point_value, 1e-9)
+            progress_pct = (curr_dist / target_pts) * 100.0 if target_pts > 0 else 0
+
+            # 1. Break-even / Trava
+            if progress_pct >= be_trigger:
+                new_sl = entry_price + (gordurinha * point_value) if side == "BUY" else entry_price - (gordurinha * point_value)
+                if (side == "BUY" and new_sl > sl_price) or (side == "SELL" and new_sl < sl_price):
+                    open_trade["sl_price"] = new_sl
+                    sl_price = new_sl # Update local for exit check below
+                    open_trade["managed"] = True
+
+            # 2. Arraste (Trailing) FIM-018
+            if drag_mode == 2 and progress_pct >= be_trigger:
+                # Arraste infinito mantendo a gordurinha do pico de preço
+                if side == "BUY":
+                    trail_sl = high_price - (gordurinha * point_value)
+                    if trail_sl > sl_price:
+                        open_trade["sl_price"] = trail_sl
+                        sl_price = trail_sl
+                else:
+                    trail_sl = low_price + (gordurinha * point_value)
+                    if trail_sl < sl_price:
+                        open_trade["sl_price"] = trail_sl
+                        sl_price = trail_sl
+
+            # --- Check Exits ---
             exit_price = None
             result = None
             if side == "BUY":
                 if low_price <= sl_price:
                     exit_price = sl_price
-                    result = "LOSS"
                 elif high_price >= tp_price:
                     exit_price = tp_price
-                    result = "WIN"
             else:
                 if high_price >= sl_price:
                     exit_price = sl_price
-                    result = "LOSS"
                 elif low_price <= tp_price:
                     exit_price = tp_price
-                    result = "WIN"
 
             if exit_price is not None:
-                raw_points = (exit_price - open_trade["entry_price"]) / max(point_value, 1e-9)
+                raw_points = (exit_price - entry_price) / max(point_value, 1e-9)
                 if side == "SELL":
                     raw_points = -raw_points
                 cost_points = spread_points + slippage_points
                 net_points = raw_points - cost_points
+                # Re-check result based on final net_points
+                result = "0x0" if abs(net_points) <= 1.0 else "WIN" if net_points > 1.0 else "LOSS"
+                
                 running_equity += net_points
                 equity_curve.append(running_equity)
                 pnl_points.append(net_points)
@@ -224,38 +331,49 @@ def run_replay_backtest(
                         side=side,
                         entry_time=open_trade["entry_time"],
                         exit_time=now_time,
-                        entry_price=open_trade["entry_price"],
+                        entry_price=entry_price,
                         exit_price=exit_price,
                         sl_price=sl_price,
                         tp_price=tp_price,
                         pnl_points=net_points,
                         result=result,
                         config_hash=cfg_hash,
+                        rule_id=open_trade.get("rule_id"),
+                        reason=open_trade.get("reason"),
                     )
                 )
                 open_trade = None
             continue
 
-        trend_slice = frame["close"].tail(trend_candles)
-        slope_points = _calc_slope_points(trend_slice, point_value)
-        trend_direction = "BUY" if slope_points >= slope_min else "SELL" if slope_points <= -slope_min else None
-        if trend_direction is None:
+        # --- Analise High-Fidelity via SignalDetector Oficial ---
+        detector.set_static_data(trend_tf, trend_df)
+        detector.set_static_data(entry_tf, entry_df)
+        
+        signal_details = detector.evaluate_signal_details(
+            current_price=close_price,
+            levels=sr_levels,
+            current_spread=spread_points
+        )
+        
+        # Bloqueio de Warmup: não operamos nos primeiros passos para deixar o motor "cozinhar" a caixa
+        if current_step < WARMUP_BARS:
             continue
-
-        channel_slice = frame.tail(lookback)
-        channel_high = float(channel_slice["high"].max())
-        channel_low = float(channel_slice["low"].min())
-        channel_mid = (channel_high + channel_low) / 2.0
-        breakout_price = breakout_points * point_value
-        channel_size = max(channel_high - channel_low, point_value * 20.0)
-
-        candidate_side = "BUY" if close_price >= (channel_mid + breakout_price) else "SELL" if close_price <= (channel_mid - breakout_price) else None
+        
+        candidate_side = signal_details.get("signal")
         if candidate_side is None:
+            # Registrar o motivo do bloqueio para diagnóstico
+            reason = signal_details.get("reason", "unknown")
+            blocker_stats[reason] = blocker_stats.get(reason, 0) + 1
             continue
-        if candidate_side != trend_direction and bool(config.get("require_structural_trend", True)):
-            continue
+            
+        rule_id = signal_details.get("rule_id")
+        reason = signal_details.get("reason")
 
         entry_price = close_price
+        channel_size = signal_details.get("channel_size") or (abs(signal_details.get("point_a", 0) - signal_details.get("point_b", 0)))
+        if not channel_size or channel_size <= 0:
+            channel_size = breakout_points * point_value * 5 # fallback
+            
         if candidate_side == "BUY":
             sl_price = entry_price - (channel_size * 0.5)
             tp_price = entry_price + (channel_size * max(rr_ratio, 0.7))
@@ -269,17 +387,22 @@ def run_replay_backtest(
             "entry_time": now_time,
             "sl_price": sl_price,
             "tp_price": tp_price,
+            "rule_id": rule_id,
+            "reason": reason,
         }
 
     total_trades = len(pnl_points)
-    wins = [x for x in pnl_points if x > 0]
-    losses = [x for x in pnl_points if x <= 0]
-    gross_profit = float(sum(wins))
-    gross_loss_abs = abs(float(sum(losses)))
+    wins = [x for x in pnl_points if x > 1.0]
+    be = [x for x in pnl_points if abs(x) <= 1.0]
+    losses = [x for x in pnl_points if x < -1.0]
+    
+    gross_profit = float(sum([x for x in pnl_points if x > 0]))
+    gross_loss_abs = abs(float(sum([x for x in pnl_points if x < 0])))
+    
     profit_factor = (gross_profit / gross_loss_abs) if gross_loss_abs > 0 else (gross_profit if gross_profit > 0 else 0.0)
     win_rate = (len(wins) / total_trades * 100.0) if total_trades > 0 else 0.0
     avg_win = (gross_profit / len(wins)) if wins else 0.0
-    avg_loss = (abs(sum(losses)) / len(losses)) if losses else 0.0
+    avg_loss = (gross_loss_abs / len(losses)) if losses else 0.0
     payoff = (avg_win / avg_loss) if avg_loss > 0 else 0.0
     max_drawdown = 0.0
     if equity_curve:
@@ -290,6 +413,9 @@ def run_replay_backtest(
 
     metrics = {
         "total_trades": float(total_trades),
+        "wins_count": len(wins),
+        "losses_count": len(losses),
+        "be_count": len(be),
         "total_pnl_points": round(float(sum(pnl_points)), 2),
         "win_rate": round(win_rate, 2),
         "payoff": round(payoff, 2),
@@ -301,7 +427,30 @@ def run_replay_backtest(
     metrics["score"] = _score_from_metrics(metrics)
     metrics["score_breakdown"] = score_breakdown(metrics)
     metrics["blocked_rate"] = round(max(0.0, 100.0 - ((total_trades / max(len(candles), 1)) * 100.0)), 2)
+    
+    # Diagnóstico de Bloqueio se 0 trades
+    if total_trades == 0 and blocker_stats:
+        main_blocker = max(blocker_stats, key=blocker_stats.get)
+        reason_map = {
+            "mercado_lateral": "Tendência Lateral (FIM-002)",
+            "aguardando_agrupamento": "Aguardando Agrupamento (FIM-006)",
+            "aguardando_rompimento_canal": "Aguardando Rompimento (FIM-007)",
+            "aguardando_pullback": "Aguardando Pullback (FIM-011)",
+            "fora_da_regiao_negociavel": "Fora da Região Negociável (FIM-005)",
+            "longe_do_nivel_sr": "Longe do Nível S/R (FIM-008)",
+            "sem_dados_timeframe": "Dados insuficientes no Timeframe",
+            "perimetro_seguranca_bloqueado": "Proteção de Perímetro Ativa"
+        }
+        metrics["diagnostic"] = f"Bloqueio predominante: {reason_map.get(main_blocker, main_blocker)}"
+    else:
+        metrics["diagnostic"] = "Simulação concluída com métricas reais."
+
     return metrics, trades
+
+
+def _run_backtest_worker(args: Tuple):
+    """Auxiliar para o Pool de Processos."""
+    return run_replay_backtest(*args)
 
 
 def run_matrix_backtest(
@@ -313,16 +462,23 @@ def run_matrix_backtest(
     slippage_points: float,
     include_pairwise: bool = True,
 ) -> List[Dict[str, Any]]:
+    variants = build_strategy_variations(base_config=base_config, include_pairwise=include_pairwise)
+    
+    # Preparar argumentos para execução em paralelo
+    worker_args = [
+        (symbol, candles_df, cfg, point_value, spread_points, slippage_points)
+        for cfg in variants
+    ]
+    
     results: List[Dict[str, Any]] = []
-    for cfg in build_strategy_variations(base_config=base_config, include_pairwise=include_pairwise):
-        metrics, trades = run_replay_backtest(
-            symbol=symbol,
-            candles_df=candles_df,
-            config=cfg,
-            point_value=point_value,
-            spread_points=spread_points,
-            slippage_points=slippage_points,
-        )
+    
+    # Usar todos os cores disponíveis (máximo de 8 para evitar overhead de contexto)
+    max_workers = min(os.cpu_count() or 4, 8)
+    
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        batch_results = list(executor.map(_run_backtest_worker, worker_args))
+        
+    for cfg, (metrics, trades) in zip(variants, batch_results):
         results.append(
             {
                 "preset_id": str(cfg.get("preset_id", "CUSTOM")),
@@ -332,5 +488,6 @@ def run_matrix_backtest(
                 "trades": trades,
             }
         )
+    
     results.sort(key=lambda item: float(item["metrics"].get("score", 0.0)), reverse=True)
     return results
