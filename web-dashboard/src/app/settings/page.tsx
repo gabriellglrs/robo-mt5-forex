@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -1041,7 +1041,7 @@ export default function SettingsPage() {
                       </label>
                        <input 
                           type="number"
-                          min={5}
+                          min={7}
                           max={300}
                           value={settings.analysis?.ab_lookback_candles || 80}
                           onChange={(e) => updateNested('analysis', 'ab_lookback_candles', parseInt(e.target.value || '80', 10))}

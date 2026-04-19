@@ -63,6 +63,7 @@ export interface FimatheAsset {
   max_open_positions: number;
   current_pnl?: number;
   trading_type?: string;
+  box_locked?: boolean;
 }
 
 export interface RuntimeSnapshot {

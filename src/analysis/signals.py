@@ -61,8 +61,8 @@ class SignalDetector:
         return None, slope_points
 
     def _build_ab_projection(self, trend_df, trend_direction):
-        # Permite ao usuário espremer a caixa até 5 velas se desejar canais micro
-        lookback = max(5, min(300, int(self.settings.get("ab_lookback_candles", 80))))
+        # Permite ao usuario espremer a caixa ate 7 velas se desejar canais micro (trava de seguranca)
+        lookback = max(7, min(300, int(self.settings.get("ab_lookback_candles", 80))))
         window = trend_df.tail(lookback)
 
         point_a = float(window["high"].max())
@@ -117,10 +117,24 @@ class SignalDetector:
             self._reset_frozen_projection()
             return
 
-        keep_frozen_reasons = {"aguardando_rompimento_canal", "aguardando_pullback"}
+        # Motivos que justificam manter o canal congelado para evitar o efeito "Cenoura/Arraste"
+        # Agora inclumos 'fora_da_regiao_negociavel' para garantir que o canal no "fique andando" 
+        # junto com o preco enquanto o setup est sendo montado.
+        keep_frozen_reasons = {
+            "aguardando_agrupamento", 
+            "aguardando_rompimento_canal", 
+            "aguardando_pullback",
+            "fora_da_regiao_negociavel",
+            "longe_do_nivel_sr",
+            "setup_pronto"
+        }
+        
+        # Se a tendencia mudar radicalmente, resetamos o lock imediatamente
         if self._frozen_projection_map is not None and self._frozen_projection_trend != trend_direction:
             self._reset_frozen_projection()
 
+        # Condicao de Congelamento (LOCK): 
+        # Se estamos em uma fase operacional ou de espera e ainda nao temos trava, travamos agora.
         if (
             reason in keep_frozen_reasons
             and trend_direction
@@ -131,8 +145,13 @@ class SignalDetector:
             self._frozen_projection_trend = trend_direction
             return
 
-        if reason not in keep_frozen_reasons:
-            self._reset_frozen_projection()
+        # Condicao de Manutencao (HYSTERESIS):
+        # Se ja estamos travados e o motivo mudou para algo fora da lista (ex: Mercado Lateral),
+        # s destravamos se houver uma invalidacao grave.
+        if self._frozen_projection_map is not None and reason not in keep_frozen_reasons:
+            critical_reset_reasons = {"mercado_lateral", "sem_dados_timeframe", "sem_regiao_ab"}
+            if reason in critical_reset_reasons:
+                self._reset_frozen_projection()
 
     def _calc_grouping(self, entry_df):
         grouping_window = max(5, int(self.settings.get("grouping_window_candles", 12)))
@@ -170,7 +189,6 @@ class SignalDetector:
         nearest_distance = min(abs(current_price - level) for level in levels)
         return nearest_distance / float(self.point)
 
-
     def _check_structural_trend(self, trend_df, direction):
         """Valida FIM-016: Confluencia estrutural por Topos e Fundos (H1)."""
         if trend_df is None or len(trend_df) < 10:
@@ -193,10 +211,7 @@ class SignalDetector:
         if df_m1 is None or len(df_m1) < count:
             return False
             
-        # Calcula range da consolidacao
         price_range = (df_m1["high"].max() - df_m1["low"].min()) / float(self.point)
-        # Limite toleravel para triangulo: 15-20% do tamanho do canal medio
-        # Aqui simplificamos para um range estreito (ex: 80 pontos)
         return bool(price_range <= 80.0)
 
     def evaluate_signal_details(self, current_price, levels, indicators=None, current_spread=0.0):
@@ -206,7 +221,6 @@ class SignalDetector:
         trend_candles = max(5, min(300, int(self.settings.get("trend_candles", 200))))
         entry_lookback = max(5, min(300, int(self.settings.get("entry_lookback_candles", 50))))
 
-        # Novas Configurações
         strict_reversal = bool(self.settings.get("strict_reversal_logic", True))
         require_structural = bool(self.settings.get("require_structural_trend", True))
 
@@ -245,14 +259,12 @@ class SignalDetector:
                 "trend_direction": None,
                 "trend_slope_points": 0.0,
                 "rule_trace": decision["rule_trace"],
+                "box_locked": self._frozen_projection_map is not None,
                 **resolve_rule_meta(decision["reason"]),
             }
 
         trend_direction, slope_points = self._detect_trend(trend_df.tail(trend_candles))
 
-        # CÁLCULO DE PROJEÇÃO (Sempre executado para garantir que a UI tenha os níveis atualizados)
-        # Se a tendência for lateral, usamos 'BUY' apenas como base técnica para o lookback, 
-        # mas o sinal continuará bloqueado pela máquina de estados.
         dynamic_projection_map = self._build_ab_projection(trend_df, trend_direction or "BUY")
         projection_map = self._select_projection_map(dynamic_projection_map, trend_direction)
         ab_ok = projection_map.get("point_a") is not None and projection_map.get("point_b") is not None
@@ -292,10 +304,10 @@ class SignalDetector:
                 "projection_85": projection_map.get("projection_85") if ab_ok else None,
                 "projection_100": projection_map["projection_100"] if ab_ok else None,
                 "rule_trace": decision["rule_trace"],
+                "box_locked": self._frozen_projection_map is not None,
                 **resolve_rule_meta(decision["reason"]),
             }
 
-        # FIM-016: Structural Trend Confluence
         structural_ok = self._check_structural_trend(trend_df, trend_direction) if trend_direction else False
         
         if not ab_ok:
@@ -323,6 +335,7 @@ class SignalDetector:
                 "trend_direction": trend_direction,
                 "trend_slope_points": round(float(slope_points), 2),
                 "rule_trace": decision["rule_trace"],
+                "box_locked": self._frozen_projection_map is not None,
                 **resolve_rule_meta(decision["reason"]),
             }
 
@@ -343,8 +356,6 @@ class SignalDetector:
         breakout_buffer_price = breakout_points * float(self.point)
         pullback_tolerance_price = pullback_tolerance * float(self.point)
 
-        # Determine candidate signal based on position relative to channel_mid
-        # Even if trend is BUY, we might have a candidate SELL (reversal)
         is_above_mid = current_price >= channel_mid
         
         if is_above_mid:
@@ -356,23 +367,19 @@ class SignalDetector:
             pullback_ok = (last_high >= (channel_mid - pullback_tolerance_price)) if require_pullback else True
             candidate_signal = "SELL"
 
-        # FIM-015: Strict Reversal check
         reversal_ok = True
         if strict_reversal:
-            # Venda em Tendencia de Alta
             if trend_direction == "BUY" and candidate_signal == "SELL":
                 dist_points = (projection_map["point_b"] - current_price) / float(self.point)
                 levels_dropped = dist_points / (projection_map["channel_size"] / float(self.point))
                 triangle_ok = self._check_triangle_consolidation()
                 reversal_ok = bool(levels_dropped >= 2.0 and triangle_ok)
-            # Compra em Tendencia de Baixa
             elif trend_direction == "SELL" and candidate_signal == "BUY":
                 dist_points = (current_price - projection_map["point_a"]) / float(self.point)
                 levels_risen = dist_points / (projection_map["channel_size"] / float(self.point))
                 triangle_ok = self._check_triangle_consolidation()
                 reversal_ok = bool(levels_risen >= 2.0 and triangle_ok)
 
-        # Prepare technicals for the state machine
         technicals = {
             "data_ok": True,
             "trend_direction": trend_direction,
@@ -388,11 +395,9 @@ class SignalDetector:
             "current_spread": current_spread
         }
         
-        # Execute decision
         decision = evaluate_state_machine(technicals, self.settings)
         self._update_frozen_projection(decision["reason"], trend_direction, projection_map)
 
-        # Build final payload
         return {
             "signal": decision["signal"],
             "reason": decision["reason"],
@@ -469,4 +474,3 @@ class SignalDetector:
             )
             return final_signal
         return None
-

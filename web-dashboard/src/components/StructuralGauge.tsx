@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Zap } from 'lucide-react';
 
 interface StructuralGaugeProps {
   currentPrice?: number;
@@ -10,6 +11,7 @@ interface StructuralGaugeProps {
   target50?: number;
   target100?: number;
   trendDirection?: string;
+  boxLocked?: boolean;
 }
 
 export default function StructuralGauge({
@@ -20,6 +22,7 @@ export default function StructuralGauge({
   target100,
   trendDirection,
   trendTimeframe,
+  boxLocked,
 }: StructuralGaugeProps & { trendTimeframe?: string }) {
   if (!pointA || !pointB || currentPrice === undefined) return null;
 
@@ -39,7 +42,20 @@ export default function StructuralGauge({
       <div className="flex items-center justify-between px-1">
         <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Altímetro Fimathe</h3>
         <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${trendDirection ? 'bg-primary' : 'bg-gray-500'} animate-pulse shadow-[0_0_8px_rgba(0,255,170,0.4)]`} />
+            <AnimatePresence>
+                {boxLocked && (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                        animate={{ opacity: 1, scale: 1, x: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, x: 20 }}
+                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/20 border border-primary/40 shadow-[0_0_10px_rgba(0,255,170,0.3)] mr-1"
+                    >
+                        <Zap className="w-2.5 h-2.5 text-primary" />
+                        <span className="text-[8px] font-black text-primary uppercase tracking-tighter">Box Locked</span>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <div className={`w-1.5 h-1.5 rounded-full ${trendDirection ? 'bg-primary' : 'bg-gray-500'} ${boxLocked ? 'animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]' : 'animate-pulse'} shadow-[0_0_8px_rgba(0,255,170,0.4)]`} />
             <span className={`text-[10px] font-black uppercase tracking-widest ${trendDirection ? 'text-primary' : 'text-gray-500'}`}>Monitoramento Ativo</span>
         </div>
       </div>

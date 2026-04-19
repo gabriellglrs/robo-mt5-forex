@@ -239,6 +239,7 @@ function AssetFimatheCard({ asset }: { asset: FimatheAsset }) {
               target100={asset.projection_100}
               trendDirection={asset.trend_direction}
               trendTimeframe={asset.trend_timeframe}
+              boxLocked={asset.box_locked}
             />
           </div>
         </div>

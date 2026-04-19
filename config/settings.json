@@ -8,7 +8,7 @@
         "history_years": 2,
         "wick_sensitivity": 0.3,
         "trend_candles": 40,
-        "ab_lookback_candles": 7
+        "ab_lookback_candles": 5
     },
     "signal_logic": {
         "trend_timeframe": "M15",

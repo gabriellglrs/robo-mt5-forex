@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import mysql.connector
 
@@ -111,6 +112,62 @@ class DatabaseManager:
         )
         """
 
+        lab_runs_sql = """
+        CREATE TABLE IF NOT EXISTS lab_runs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            symbol VARCHAR(20) NOT NULL,
+            window_days INT NOT NULL,
+            preset_id VARCHAR(40) NOT NULL,
+            spread_model DOUBLE DEFAULT 0,
+            slippage_model DOUBLE DEFAULT 0,
+            status VARCHAR(20) NOT NULL,
+            config_snapshot_json JSON,
+            config_hash VARCHAR(64),
+            error_message TEXT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            started_at DATETIME NULL,
+            finished_at DATETIME NULL
+        )
+        """
+
+        lab_results_sql = """
+        CREATE TABLE IF NOT EXISTS lab_results (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            run_id INT NOT NULL,
+            symbol VARCHAR(20) NOT NULL,
+            window_days INT NOT NULL,
+            preset_id VARCHAR(60) NOT NULL,
+            config_hash VARCHAR(64) NOT NULL,
+            score DOUBLE DEFAULT 0,
+            score_breakdown_json JSON,
+            metrics_json JSON,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (run_id) REFERENCES lab_runs(id) ON DELETE CASCADE
+        )
+        """
+
+        lab_trades_sql = """
+        CREATE TABLE IF NOT EXISTS lab_trades (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            run_id INT NOT NULL,
+            result_id INT NOT NULL,
+            symbol VARCHAR(20) NOT NULL,
+            side VARCHAR(8) NOT NULL,
+            entry_time DATETIME NOT NULL,
+            exit_time DATETIME NOT NULL,
+            entry_price DOUBLE,
+            exit_price DOUBLE,
+            sl_price DOUBLE,
+            tp_price DOUBLE,
+            pnl_points DOUBLE,
+            result VARCHAR(12),
+            config_hash VARCHAR(64),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (run_id) REFERENCES lab_runs(id) ON DELETE CASCADE,
+            FOREIGN KEY (result_id) REFERENCES lab_results(id) ON DELETE CASCADE
+        )
+        """
+
         conn = self.pool.get_connection()
         cursor = conn.cursor()
         try:
@@ -118,6 +175,9 @@ class DatabaseManager:
             cursor.execute(trades_sql)
             cursor.execute(logs_sql)
             cursor.execute(notifications_sql)
+            cursor.execute(lab_runs_sql)
+            cursor.execute(lab_results_sql)
+            cursor.execute(lab_trades_sql)
             
             # Adiciona a coluna settings_id caso a tabela trades ja exista (migracao)
             try:
@@ -136,11 +196,324 @@ class DatabaseManager:
             except Exception:
                 pass
 
+            # Indices para leitura rápida do Strategy Lab
+            try:
+                cursor.execute("CREATE INDEX idx_lab_runs_symbol_window_preset_created ON lab_runs(symbol, window_days, preset_id, created_at)")
+            except Exception:
+                pass
+            try:
+                cursor.execute("CREATE INDEX idx_lab_results_run_score ON lab_results(run_id, score)")
+            except Exception:
+                pass
+            try:
+                cursor.execute("CREATE INDEX idx_lab_results_symbol_window_score ON lab_results(symbol, window_days, score)")
+            except Exception:
+                pass
+
             conn.commit()
             self.logger.info("Tabelas do sistema (trades, logs, settings) verificadas/criadas.")
         finally:
             cursor.close()
             conn.close()
+
+    def create_lab_run(
+        self,
+        symbol: str,
+        window_days: int,
+        preset_id: str,
+        spread_model: float,
+        slippage_model: float,
+        config_snapshot: Dict[str, Any],
+        config_hash: str,
+    ) -> Optional[int]:
+        sql = """
+        INSERT INTO lab_runs (
+            symbol, window_days, preset_id, spread_model, slippage_model,
+            status, config_snapshot_json, config_hash, created_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                sql,
+                (
+                    symbol,
+                    int(window_days),
+                    preset_id,
+                    float(spread_model),
+                    float(slippage_model),
+                    "queued",
+                    json.dumps(config_snapshot, ensure_ascii=False),
+                    config_hash,
+                    datetime.now(),
+                ),
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+        except Exception as exc:
+            self.logger.error(f"Erro ao criar run de laboratorio: {exc}")
+            return None
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def update_lab_run_status(self, run_id: int, status: str, error_message: Optional[str] = None):
+        status_value = str(status or "failed").lower()
+        now = datetime.now()
+        started_at = now if status_value == "running" else None
+        finished_at = now if status_value in {"done", "failed", "cancelled"} else None
+        sql = """
+        UPDATE lab_runs
+        SET status = %s,
+            error_message = %s,
+            started_at = COALESCE(%s, started_at),
+            finished_at = COALESCE(%s, finished_at)
+        WHERE id = %s
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, (status_value, error_message, started_at, finished_at, int(run_id)))
+            conn.commit()
+        except Exception as exc:
+            self.logger.error(f"Erro ao atualizar status do lab run {run_id}: {exc}")
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def save_lab_result(
+        self,
+        run_id: int,
+        symbol: str,
+        window_days: int,
+        preset_id: str,
+        config_hash: str,
+        score: float,
+        score_breakdown: Dict[str, Any],
+        metrics: Dict[str, Any],
+    ) -> Optional[int]:
+        sql = """
+        INSERT INTO lab_results (
+            run_id, symbol, window_days, preset_id, config_hash,
+            score, score_breakdown_json, metrics_json, created_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                sql,
+                (
+                    int(run_id),
+                    symbol,
+                    int(window_days),
+                    preset_id,
+                    config_hash,
+                    float(score),
+                    json.dumps(score_breakdown, ensure_ascii=False),
+                    json.dumps(metrics, ensure_ascii=False),
+                    datetime.now(),
+                ),
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar resultado do lab run {run_id}: {exc}")
+            return None
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def save_lab_trade(self, run_id: int, result_id: int, trade: Dict[str, Any]):
+        sql = """
+        INSERT INTO lab_trades (
+            run_id, result_id, symbol, side, entry_time, exit_time,
+            entry_price, exit_price, sl_price, tp_price, pnl_points, result, config_hash, created_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                sql,
+                (
+                    int(run_id),
+                    int(result_id),
+                    trade.get("symbol"),
+                    trade.get("side"),
+                    trade.get("entry_time"),
+                    trade.get("exit_time"),
+                    trade.get("entry_price"),
+                    trade.get("exit_price"),
+                    trade.get("sl_price"),
+                    trade.get("tp_price"),
+                    trade.get("pnl_points"),
+                    trade.get("result"),
+                    trade.get("config_hash"),
+                    datetime.now(),
+                ),
+            )
+            conn.commit()
+        except Exception as exc:
+            self.logger.error(f"Erro ao salvar trade de laboratorio: {exc}")
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def get_lab_runs(self, limit: int = 100, symbol: Optional[str] = None, window_days: Optional[int] = None, preset_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        clauses = []
+        params: List[Any] = []
+        if symbol:
+            clauses.append("symbol = %s")
+            params.append(str(symbol).upper())
+        if window_days:
+            clauses.append("window_days = %s")
+            params.append(int(window_days))
+        if preset_id:
+            clauses.append("preset_id = %s")
+            params.append(str(preset_id))
+        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"""
+        SELECT
+            id, symbol, window_days, preset_id, spread_model, slippage_model,
+            status, config_hash, error_message, created_at, started_at, finished_at
+        FROM lab_runs
+        {where_sql}
+        ORDER BY id DESC
+        LIMIT %s
+        """
+        params.append(max(1, min(int(limit), 500)))
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(sql, tuple(params))
+            return cursor.fetchall() or []
+        except Exception as exc:
+            self.logger.error(f"Erro ao listar lab runs: {exc}")
+            return []
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def get_lab_run_detail(self, run_id: int) -> Dict[str, Any]:
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """
+                SELECT
+                    id, symbol, window_days, preset_id, spread_model, slippage_model,
+                    status, config_snapshot_json, config_hash, error_message,
+                    created_at, started_at, finished_at
+                FROM lab_runs
+                WHERE id = %s
+                """,
+                (int(run_id),),
+            )
+            run = cursor.fetchone()
+            if not run:
+                return {}
+            cursor.execute(
+                """
+                SELECT id, run_id, symbol, window_days, preset_id, config_hash, score, score_breakdown_json, metrics_json, created_at
+                FROM lab_results
+                WHERE run_id = %s
+                ORDER BY score DESC, id ASC
+                """,
+                (int(run_id),),
+            )
+            results = cursor.fetchall() or []
+            for row in results:
+                for key in ("score_breakdown_json", "metrics_json"):
+                    raw = row.get(key)
+                    if isinstance(raw, str):
+                        try:
+                            row[key.replace("_json", "")] = json.loads(raw)
+                        except Exception:
+                            row[key.replace("_json", "")] = {}
+                    elif isinstance(raw, dict):
+                        row[key.replace("_json", "")] = raw
+                    else:
+                        row[key.replace("_json", "")] = {}
+            run["results"] = results
+            return run
+        except Exception as exc:
+            self.logger.error(f"Erro ao carregar detalhe do lab run {run_id}: {exc}")
+            return {}
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    def get_lab_ranking(self, symbol: Optional[str] = None, window_days: Optional[int] = None, preset_id: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        clauses = []
+        params: List[Any] = []
+        if symbol:
+            clauses.append("r.symbol = %s")
+            params.append(str(symbol).upper())
+        if window_days:
+            clauses.append("r.window_days = %s")
+            params.append(int(window_days))
+        if preset_id:
+            clauses.append("r.preset_id = %s")
+            params.append(str(preset_id))
+        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"""
+        SELECT
+            r.symbol,
+            r.window_days,
+            r.preset_id,
+            COUNT(*) AS sample_size,
+            ROUND(AVG(r.score), 2) AS avg_score,
+            ROUND(MAX(r.score), 2) AS best_score,
+            ROUND(AVG(JSON_EXTRACT(r.metrics_json, '$.total_pnl_points')), 2) AS avg_pnl_points,
+            ROUND(AVG(JSON_EXTRACT(r.metrics_json, '$.win_rate')), 2) AS avg_win_rate
+        FROM lab_results r
+        {where_sql}
+        GROUP BY r.symbol, r.window_days, r.preset_id
+        ORDER BY avg_score DESC, best_score DESC
+        LIMIT %s
+        """
+        params.append(max(1, min(int(limit), 500)))
+        conn = None
+        cursor = None
+        try:
+            conn = self.pool.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(sql, tuple(params))
+            return cursor.fetchall() or []
+        except Exception as exc:
+            self.logger.error(f"Erro ao carregar ranking do strategy lab: {exc}")
+            return []
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
 
     def save_notification(self, event: dict):
         """Registra auditoria de notificacao emitida/suprimida."""

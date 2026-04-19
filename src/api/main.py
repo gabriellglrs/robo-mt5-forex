@@ -1,6 +1,8 @@
 import json
 import os
 import sys
+import csv
+import io
 
 # --- CONFIGURACAO DE PATH (CRITICO PARA IMPORTACAO DO PACOTE SRC) ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -19,6 +21,7 @@ import mysql.connector
 import threading
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 import bcrypt
@@ -27,6 +30,7 @@ from pydantic import BaseModel
 from src.core.database import DatabaseManager
 from src.core.settings_schema import SettingsValidationError, validate_and_normalize_settings
 from src.notifications import NotificationService
+from src.analysis.strategy_lab_service import StrategyLabService
 
 def ensure_mt5():
     if not mt5.initialize():
@@ -108,6 +112,17 @@ class NotificationTestRequest(BaseModel):
     symbol: Optional[str] = None
     priority: Optional[str] = "P2"
     category: Optional[str] = "health"
+
+
+class StrategyLabRunRequest(BaseModel):
+    symbol: str
+    window_days: int = 7
+    preset_id: str = "FIM-010"
+    override_config: Optional[dict] = None
+    spread_model: float = 0.0
+    slippage_model: float = 0.0
+    timeframe: str = "M15"
+    include_pairwise: bool = True
 
 # --- AUXILIARES ---
 def _now_iso():
@@ -370,6 +385,122 @@ def send_test_notification(payload: NotificationTestRequest, user: str = Depends
         return {"ok": True, "result": result}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/lab/runs")
+def create_strategy_lab_run(payload: StrategyLabRunRequest, user: str = Depends(get_current_user)):
+    try:
+        if payload.window_days not in {2, 7, 14}:
+            raise HTTPException(status_code=422, detail="window_days deve ser 2, 7 ou 14.")
+        service = StrategyLabService(DatabaseManager())
+        run = service.execute_run(
+            symbol=payload.symbol,
+            window_days=int(payload.window_days),
+            preset_id=payload.preset_id,
+            override_config=payload.override_config,
+            spread_model=float(payload.spread_model),
+            slippage_model=float(payload.slippage_model),
+            timeframe=payload.timeframe,
+            include_pairwise=bool(payload.include_pairwise),
+        )
+        return {"ok": True, "run": run}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/lab/runs")
+def list_strategy_lab_runs(
+    limit: int = 60,
+    symbol: Optional[str] = None,
+    window_days: Optional[int] = None,
+    preset_id: Optional[str] = None,
+    user: str = Depends(get_current_user),
+):
+    try:
+        service = StrategyLabService(DatabaseManager())
+        items = service.list_runs(limit=limit, symbol=symbol, window_days=window_days, preset_id=preset_id)
+        return {"items": items}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/lab/runs/{run_id}")
+def get_strategy_lab_run_detail(run_id: int, user: str = Depends(get_current_user)):
+    try:
+        service = StrategyLabService(DatabaseManager())
+        detail = service.run_detail(run_id=run_id)
+        if not detail:
+            raise HTTPException(status_code=404, detail="Run de laboratorio nao encontrado.")
+        return detail
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/lab/ranking")
+def get_strategy_lab_ranking(
+    symbol: Optional[str] = None,
+    window_days: Optional[int] = None,
+    preset_id: Optional[str] = None,
+    limit: int = 100,
+    user: str = Depends(get_current_user),
+):
+    try:
+        service = StrategyLabService(DatabaseManager())
+        ranking = service.ranking(symbol=symbol, window_days=window_days, preset_id=preset_id, limit=limit)
+        return {"items": ranking}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/lab/runs/{run_id}/export")
+def export_strategy_lab_run(run_id: int, format: str = "json", user: str = Depends(get_current_user)):
+    try:
+        service = StrategyLabService(DatabaseManager())
+        detail = service.run_detail(run_id=run_id)
+        if not detail:
+            raise HTTPException(status_code=404, detail="Run de laboratorio nao encontrado.")
+        format_key = str(format or "json").lower()
+        if format_key == "json":
+            return detail
+        if format_key != "csv":
+            raise HTTPException(status_code=422, detail="Formato invalido. Use json ou csv.")
+
+        rows = detail.get("results") or []
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["run_id", "symbol", "window_days", "preset_id", "config_hash", "score", "total_pnl_points", "win_rate", "profit_factor", "max_drawdown_points"])
+        for row in rows:
+            metrics = row.get("metrics") or {}
+            writer.writerow(
+                [
+                    detail.get("id"),
+                    row.get("symbol"),
+                    row.get("window_days"),
+                    row.get("preset_id"),
+                    row.get("config_hash"),
+                    row.get("score"),
+                    metrics.get("total_pnl_points"),
+                    metrics.get("win_rate"),
+                    metrics.get("profit_factor"),
+                    metrics.get("max_drawdown_points"),
+                ]
+            )
+        output.seek(0)
+        filename = f"strategy_lab_run_{run_id}.csv"
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 
 @app.get("/api/chart/{symbol}")
 def get_chart_data(symbol: str, tf: str = "M15", user: str = Depends(get_current_user)):

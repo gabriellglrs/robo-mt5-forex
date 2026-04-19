@@ -11,6 +11,7 @@ import {
   Zap,
   GraduationCap,
   BookOpenCheck,
+  Beaker,
   ChevronLeft,
   Menu,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const menuItems = [
   { icon: Terminal, label: 'Logs & Auditoria', href: '/logs' },
   { icon: Settings, label: 'Configurações', href: '/settings' },
   { icon: BookOpenCheck, label: 'Como o Robô Opera', href: '/estrategia' },
+  { icon: Beaker, label: 'Strategy Lab', href: '/lab' },
   { icon: GraduationCap, label: 'Fimathe Academy', href: '/academy' },
 ];
 

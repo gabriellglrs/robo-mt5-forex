@@ -70,7 +70,7 @@ def validate_and_normalize_settings(settings: dict) -> dict:
     # FIMATHE - janelas principais
     ab_lookback = _to_int(analysis.get("ab_lookback_candles", 80), "analysis.ab_lookback_candles", errors)
     trend_candles = _to_int(analysis.get("trend_candles", 200), "analysis.trend_candles", errors)
-    _validate_range(ab_lookback, "analysis.ab_lookback_candles", 5, 300, errors)
+    _validate_range(ab_lookback, "analysis.ab_lookback_candles", 7, 300, errors)
     _validate_range(trend_candles, "analysis.trend_candles", 5, 300, errors)
     if ab_lookback is not None:
         analysis["ab_lookback_candles"] = ab_lookback
