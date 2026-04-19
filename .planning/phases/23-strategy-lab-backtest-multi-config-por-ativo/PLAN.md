@@ -1,73 +1,102 @@
 ﻿# PLAN: Phase 23 - Strategy Lab Backtest Multi-Config por Ativo
 
-## Objetivo de entrega
-Entregar um laboratorio funcional para rodar simulacoes historicas por ativo/preset/configuracao e gerar ranking com metricas confiaveis.
+Implementar um laboratorio de replay/backtest para comparar ativos, presets e variacoes de configuracao Fimathe em 2/7/14 dias com rastreabilidade completa.
 
-## Wave 1 - Base de simulacao
+## Objetivo de Entrega
 
-### 1.1 Engine de replay
-- [ ] Criar motor de replay que percorre OHLC em ordem temporal e chama o nucleo de decisao atual.
-- [ ] Garantir modo sem lookahead (cada candle so enxerga historico disponivel ate aquele ponto).
-- [ ] Aplicar regras de execucao simulada (spread, slippage e custos configuraveis).
+Ao final da fase, o sistema deve:
+- Rodar simulacoes historicas por ativo no mesmo fluxo de decisao do runtime.
+- Evitar lookahead bias no processamento candle a candle.
+- Salvar resultados de laboratorio em armazenamento separado da operacao real.
+- Expor API + rota web para disparo, acompanhamento e ranking.
 
-### 1.2 Contrato de execucao
-- [ ] Definir payload de run (ativo, janela, preset, variacao, custos, seed).
-- [ ] Definir formato canonico de resultado (PnL, win rate, payoff, PF, drawdown, trades, bloqueios).
-- [ ] Registrar rastreio de configuracao usada em cada run.
+## Escopo Tecnico Confirmado
 
-## Wave 2 - Cobertura multi-config
+- Reuso do nucleo atual: `src/analysis/signals.py` + `src/main.py` (sem duplicar regra Fimathe).
+- Entrada de dados historicos via MT5 usando padrao ja existente em `src/api/main.py`.
+- Persistencia em MySQL via camada atual de banco (`src/core/database.py`) com tabelas de laboratorio dedicadas.
+- Entrega web no dashboard Next.js (nova rota, sem interferir em `/monitor`).
 
-### 2.1 Matriz de configuracoes
-- [ ] Rodar 100% dos presets oficiais.
-- [ ] Gerar variacoes pairwise para parametros criticos (timeframe, risco, regras, exposicao).
-- [ ] Criar suite critica exaustiva para bloqueios de risco e limites operacionais.
+## Wave 1 - Contratos e Engine de Replay
 
-### 2.2 Persistencia de laboratorio
-- [ ] Criar tabelas de simulacao separadas da operacao real.
-- [ ] Persistir runs, resultados agregados e trades simulados.
-- [ ] Permitir consulta por ativo, periodo, preset e score.
+### 1.1 Contrato canonico de simulacao
+- [ ] Definir schema de request do laboratorio: `symbol`, `window_days`, `preset_id`, `override_config`, `spread_model`, `slippage_model`.
+- [ ] Definir schema de resposta: metricas consolidadas, metadata de execucao, hash de configuracao e id de reproducao.
+- [ ] Padronizar status de job (`queued`, `running`, `done`, `failed`, `cancelled`) para UI e API.
 
-## Wave 3 - Interface de uso
+### 1.2 Replay candle a candle sem lookahead
+- [ ] Criar modulo dedicado do laboratorio (ex.: `src/analysis/strategy_lab/`) para orquestrar replay.
+- [ ] Garantir que cada passo usa apenas historico ate o candle corrente.
+- [ ] Simular execucao com custos (spread/slippage/comissao) configuraveis.
+- [ ] Registrar eventos de bloqueio por `rule_id` para auditoria comparavel com runtime.
 
-### 3.1 Rota/tela do laboratorio
-- [ ] Criar rota dedicada (ex.: `/lab`) para disparar testes 2/7/14 dias.
-- [ ] Exibir progresso, status e erros de execucao.
-- [ ] Exibir ranking por ativo e comparacao entre presets/configuracoes.
+## Wave 2 - Matriz Multi-Config e Ranking
 
-### 3.2 Export e auditoria
-- [ ] Exportar resultados consolidados (CSV/JSON).
-- [ ] Exibir explicacao minima de criterios do score.
-- [ ] Garantir reprodutibilidade por run id + configuracao.
+### 2.1 Geracao de combinacoes sem explosao combinatoria
+- [ ] Cobrir 100% dos presets oficiais (`FIM-010`, `FIM-017`, `FIM-018` e demais ativos no sistema).
+- [ ] Implementar variacoes pairwise para parametros criticos (risco, timeframe, filtros, exposicao).
+- [ ] Implementar suite critica fixa para cenarios de risco (FIM-012 e bloqueios operacionais).
 
-## UAT (criterios de aceite)
+### 2.2 Pipeline de metricas e score
+- [ ] Calcular PnL, win rate, payoff, profit factor, drawdown maximo, total de trades e taxa de bloqueio.
+- [ ] Definir score unico e explicavel para ranking por ativo/configuracao.
+- [ ] Salvar breakdown de score para permitir auditoria (por que configuracao A ficou acima de B).
 
-- [ ] Usuario consegue rodar simulacao para 2/7/14 dias por ativo.
-- [ ] Sistema compara multiplas configuracoes e retorna ranking legivel.
-- [ ] Resultados ficam salvos e consultaveis no banco sem misturar com trades reais.
-- [ ] Execucao e score sao reprodutiveis com a mesma configuracao.
+## Wave 3 - Persistencia e API
 
-## Testes recomendados
+### 3.1 Banco dedicado de laboratorio
+- [ ] Criar tabelas separadas para `lab_runs`, `lab_results`, `lab_trades` (sem misturar com `trades` reais).
+- [ ] Salvar snapshot de configuracao por run para reproducao fiel.
+- [ ] Adicionar indices por `symbol`, `window_days`, `preset_id`, `created_at` para consulta rapida.
 
-- [ ] Unit: validacao do replay e regras anti-lookahead.
-- [ ] Unit: calculo de metricas (PF, payoff, drawdown, win rate).
-- [ ] Integration: persistencia completa de run + resultados.
-- [ ] Integration: pipeline preset -> simulacao -> ranking.
-- [ ] UI/Component: render de ranking, filtros e estado de execucao.
+### 3.2 Endpoints do laboratorio
+- [ ] Criar endpoints para iniciar run, listar runs, consultar detalhes e ranking.
+- [ ] Implementar paginacao e filtros por ativo/periodo/preset.
+- [ ] Adicionar endpoint de export (CSV/JSON) por run e ranking agregado.
 
-## Riscos e mitigacoes
+## Wave 4 - Interface Web do Strategy Lab
 
-- Risco: explosao combinatoria de configs.
-  Mitigacao: presets completos + pairwise + suite critica.
+### 4.1 Rota e controles de execucao
+- [ ] Criar rota web dedicada (ex.: `/estrategia` ou `/lab`) com formulario de disparo 2/7/14 dias.
+- [ ] Exibir fila/progresso/erro/sucesso por run.
+- [ ] Permitir rerun com a mesma configuracao em um clique.
 
-- Risco: divergencia entre motor real e motor de simulacao.
-  Mitigacao: reutilizar o mesmo nucleo de decisao e criar testes de paridade.
+### 4.2 Ranking e analise comparativa
+- [ ] Exibir tabela de ranking por ativo com filtros por janela e preset.
+- [ ] Exibir comparacao lado a lado entre configuracoes selecionadas.
+- [ ] Exibir justificativa do score (metricas e pesos) para decisao do usuario.
 
-- Risco: custo alto de execucao em muitos ativos.
-  Mitigacao: filas por lote, limite de concorrencia e cache de dados historicos.
+## UAT (Criterios de Aceite)
 
-## Definicao de pronto
+- [ ] Usuario dispara simulacao 2/7/14 dias por ativo e recebe status ate conclusao.
+- [ ] Ranking final mostra comparacao clara entre presets/configuracoes por ativo.
+- [ ] Todos os resultados ficam persistidos em tabelas de laboratorio e podem ser reconsultados.
+- [ ] Reexecucao com mesma configuracao gera resultados consistentes (variacao controlada apenas por custos/mercado).
 
-- [ ] Engine de replay funcional sem lookahead.
-- [ ] Matriz inicial multi-config operacional.
-- [ ] Persistencia e ranking disponiveis em rota propria.
-- [ ] Suite minima de testes cobrindo calculo, persistencia e pipeline.
+## Plano de Testes
+
+- [ ] Unit: replay sem lookahead e consistencia de eventos por candle.
+- [ ] Unit: calculo de metricas e score com fixtures deterministicas.
+- [ ] Integration: pipeline completo (`request -> replay -> persist -> ranking`).
+- [ ] Integration: isolamento entre dados de laboratorio e operacao real.
+- [ ] API: contratos de erro/sucesso, filtros e export.
+- [ ] UI/Component: fluxo de disparo, progresso e render de ranking.
+
+## Riscos e Mitigacoes
+
+- Risco: divergencia entre comportamento do runtime e laboratorio.
+  Mitigacao: reutilizar o mesmo nucleo de decisao e criar teste de paridade em cenarios fixos.
+
+- Risco: volume alto de combinacoes gerar custo excessivo.
+  Mitigacao: presets completos + pairwise + suite critica (sem busca exaustiva total).
+
+- Risco: ranking opaco para o usuario.
+  Mitigacao: expor formula de score e breakdown por metrica no frontend.
+
+## Definicao de Pronto
+
+- [ ] Engine de replay validada com testes anti-lookahead.
+- [ ] Matriz multi-config implementada com cobertura pragmatica.
+- [ ] Persistencia separada e API de consulta/export operacionais.
+- [ ] Rota web de laboratorio entregue com ranking e comparacao.
+- [ ] Base pronta para alimentar a Phase 24 (Account Intelligence).
