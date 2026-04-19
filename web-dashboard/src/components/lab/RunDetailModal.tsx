@@ -2,14 +2,14 @@
 
 import React from 'react';
 import { 
-  X, TrendingUp, TrendingDown, Target, Clock, 
+  X, TrendingUp, TrendingDown, Target, 
   BarChart3, ListOrdered, ArrowUpRight, ArrowDownRight, AlertTriangle
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer 
 } from 'recharts';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface Trade {
   symbol: string;
@@ -29,7 +29,7 @@ interface RunDetailModalProps {
   onClose: () => void;
   result: {
     preset_id: string;
-    metrics: any;
+    metrics: Record<string, number | string | boolean>;
     trades: Trade[];
   } | null;
 }
@@ -38,16 +38,18 @@ export default function RunDetailModal({ isOpen, onClose, result }: RunDetailMod
   if (!isOpen || !result) return null;
 
   // Preparar dados para a curva de equity
-  let cumulative = 0;
+  const equityPoints = result.trades.reduce((acc: number[], t) => {
+    const last = acc.length > 0 ? acc[acc.length - 1] : 0;
+    acc.push(last + t.pnl_points);
+    return acc;
+  }, []);
+
   const chartData = [
     { time: 'Início', equity: 0 },
-    ...result.trades.map((t, idx) => {
-      cumulative += t.pnl_points;
-      return {
-        time: `Trade ${idx + 1}`,
-        equity: Number(cumulative.toFixed(2))
-      };
-    })
+    ...equityPoints.map((val, idx) => ({
+      time: `Trade ${idx + 1}`,
+      equity: Number(val.toFixed(2))
+    }))
   ];
 
   return (

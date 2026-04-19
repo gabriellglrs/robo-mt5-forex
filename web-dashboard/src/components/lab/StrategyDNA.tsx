@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   Radar, RadarChart, PolarGrid, 
-  PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer
+  PolarAngleAxis, ResponsiveContainer
 } from 'recharts';
 
 interface StrategyDNAProps {

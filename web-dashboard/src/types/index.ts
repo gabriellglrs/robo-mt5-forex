@@ -14,15 +14,15 @@ export interface Trade {
   tp: number;
   pnl: number;
   status: 'OPEN' | 'CLOSED';
-  indicators_json: any;
+  indicators_json: Record<string, number | string | boolean>;
 }
 
 export interface RobotStatus {
   status: 'running' | 'stopped' | 'error' | 'starting';
   pid?: number;
   started_at?: string;
-  trailing_actions?: any[];
-  last_cycle_action?: any;
+  trailing_actions?: string[];
+  last_cycle_action?: string;
   current_pnl?: number;
 }
 
@@ -64,13 +64,14 @@ export interface FimatheAsset {
   current_pnl?: number;
   trading_type?: string;
   box_locked?: boolean;
+  box_locked_at?: string;
 }
 
 export interface RuntimeSnapshot {
   status: string;
   updated_at: string;
   symbols: Record<string, FimatheAsset>;
-  recent_events: any[];
+  recent_events: Record<string, unknown>[];
   account?: {
     balance: number;
     equity: number;

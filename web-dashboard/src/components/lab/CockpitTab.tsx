@@ -527,7 +527,7 @@ export default function CockpitTab({
             <span className="text-[10px] font-black text-white uppercase tracking-widest">Dica Premium</span>
           </div>
           <p className="text-[11px] text-gray-400 leading-relaxed italic">
-            "Ativos com alta volatilidade (como ETHUSD) geralmente perforam melhor com buffers de rompimento maiores (&gt; 12 pts) para evitar falsos sinais."
+            &quot;Ativos com alta volatilidade (como ETHUSD) geralmente perforam melhor com buffers de rompimento maiores (&gt; 12 pts) para evitar falsos sinais.&quot;
           </p>
         </div>
       </div>

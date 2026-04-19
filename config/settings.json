@@ -23,7 +23,7 @@
         "max_spread_points": 30,
         "require_pullback_retest": false,
         "strict_reversal_logic": true,
-        "require_structural_trend": true,
+        "require_structural_trend": false,
         "triangle_m1_candles": 5,
         "target_level_mode": "100",
         "trading_type": "scalper",

@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { 
-  History, Search, Filter, Calendar, 
-  ChevronRight, AlertCircle, CheckCircle2, 
-  Clock, Beaker, ExternalLink, Download, Trash2
+  History, Search, Calendar, 
+  AlertCircle,
+  Beaker, Download, Trash2
 } from 'lucide-react';
 
 interface LabRun {
