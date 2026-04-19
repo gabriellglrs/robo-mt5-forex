@@ -106,6 +106,31 @@ def test_infinity_mode():
     assert abs(res["action"]["candidate_sl"] - 1.1200) < 1e-7
     print("test_infinity_mode: OK")
 
+
+def test_cycle_top_level_50_uses_projection_50():
+    point = 0.0001
+    context = _base_context()
+    config = {
+        "fimathe_management_mode": "standard",
+        "fimathe_cycle_top_level": "50",
+        "fimathe_cycle_top_retrace_points": 5,
+        "fimathe_cycle_min_profit_points": 20,
+        "fimathe_cycle_protection_buffer_points": 0,
+        "fimathe_cycle_breakeven_offset_points": 0,
+    }
+    open_price = 1.1000
+    state = None
+
+    # Sobe ate 50% (mas ainda abaixo de 80%), armando o "perdeu_topo" do ciclo em 50%.
+    res = evaluate_fimathe_cycle_event("BUY", 1.1052, open_price, context, state, config, point)
+    state = res["state"]
+
+    # Retracao curta ja deve disparar evento quando top_level=50.
+    res = evaluate_fimathe_cycle_event("BUY", 1.1040, open_price, context, state, config, point)
+    assert res["action"] is not None
+    assert res["action"]["event"] == "perdeu_topo"
+    assert res["action"]["rule_id"] == "FIM-010"
+
 if __name__ == "__main__":
     try:
         test_standard_mode_integrity()

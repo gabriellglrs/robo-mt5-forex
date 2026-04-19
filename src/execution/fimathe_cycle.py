@@ -50,6 +50,8 @@ def _crossed_back_from_level(side, previous_price, current_price, level):
 
 
 def _top_reference(context, top_level):
+    if str(top_level) == "50":
+        return context.get("projection_50")
     if str(top_level) == "100":
         return context.get("projection_100")
     if str(top_level) == "95":

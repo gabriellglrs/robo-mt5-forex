@@ -168,3 +168,75 @@ def test_state_machine_full_sell():
     assert res["signal"] == "SELL"
     assert res["reason"] == "setup_pronto"
     assert res["rule_id"] == "FIM-008"
+
+
+def test_state_machine_blocks_when_spread_is_above_limit():
+    techs = {
+        "data_ok": True,
+        "trend_direction": "BUY",
+        "structural_ok": True,
+        "reversal_ok": True,
+        "ab_ok": True,
+        "near_trade_region": True,
+        "grouping_ok": True,
+        "breakout_ok": True,
+        "pullback_ok": True,
+        "near_sr": True,
+        "candidate_signal": "BUY",
+        "current_spread": 45,
+    }
+    res = evaluate_state_machine(techs, {"max_spread_points": 30})
+    assert res["signal"] is None
+    assert res["reason"] == "spread_alto"
+    assert res["rule_id"] == "FIM-009"
+    assert res["rule_trace"]["FIM-009"] == "bloqueado"
+
+
+def test_state_machine_reversal_toggle_respected():
+    techs = {
+        "data_ok": True,
+        "trend_direction": "BUY",
+        "structural_ok": True,
+        "reversal_ok": False,
+        "ab_ok": True,
+        "near_trade_region": True,
+        "grouping_ok": True,
+        "breakout_ok": True,
+        "pullback_ok": True,
+        "near_sr": True,
+        "candidate_signal": "BUY",
+    }
+
+    blocked = evaluate_state_machine(techs, {"strict_reversal_logic": True})
+    assert blocked["reason"] == "reversao_bloqueada"
+    assert blocked["rule_id"] == "FIM-015"
+
+    released = evaluate_state_machine(techs, {"strict_reversal_logic": False})
+    assert released["reason"] == "setup_pronto"
+    assert released["signal"] == "BUY"
+    assert released["rule_trace"]["FIM-015"] == "desativado"
+
+
+def test_state_machine_structural_toggle_respected():
+    techs = {
+        "data_ok": True,
+        "trend_direction": "BUY",
+        "structural_ok": False,
+        "reversal_ok": True,
+        "ab_ok": True,
+        "near_trade_region": True,
+        "grouping_ok": True,
+        "breakout_ok": True,
+        "pullback_ok": True,
+        "near_sr": True,
+        "candidate_signal": "BUY",
+    }
+
+    blocked = evaluate_state_machine(techs, {"require_structural_trend": True})
+    assert blocked["reason"] == "tendencia_sem_confluencia"
+    assert blocked["rule_id"] == "FIM-016"
+
+    released = evaluate_state_machine(techs, {"require_structural_trend": False})
+    assert released["reason"] == "setup_pronto"
+    assert released["signal"] == "BUY"
+    assert released["rule_trace"]["FIM-016"] == "desativado"

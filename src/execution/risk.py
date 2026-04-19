@@ -87,19 +87,30 @@ class RiskManager:
 
             point_a = details.get("point_a")
             point_b = details.get("point_b")
+            proj_50 = details.get("projection_50")
             proj_80 = details.get("projection_80")
             proj_85 = details.get("projection_85")
+            proj_90 = details.get("projection_90")
+            proj_95 = details.get("projection_95")
             proj_100 = details.get("projection_100")
+
+            targets = {
+                "50": proj_50,
+                "80": proj_80,
+                "85": proj_85,
+                "90": proj_90,
+                "95": proj_95,
+                "100": proj_100,
+            }
+            selected_target = targets.get(target_level)
 
             if signal_type == "BUY":
                 # Fimathe STI: Abaixo da Zona Neutra (que e o ponto_b no engine atual quando em rompimento)
                 structural_floor = point_b if point_b is not None else (entry_price - (sl_points * point))
                 sl_price = float(structural_floor) - (stop_buffer_points * point)
 
-                if target_level == "85" and proj_85 is not None:
-                    tp_price = float(proj_85)
-                elif target_level == "100" and proj_100 is not None:
-                    tp_price = float(proj_100)
+                if selected_target is not None:
+                    tp_price = float(selected_target)
                 else:
                     tp_price = float(proj_80) if proj_80 is not None else (entry_price + (tp_points * point))
             else:
@@ -107,10 +118,8 @@ class RiskManager:
                 structural_ceiling = point_a if point_a is not None else (entry_price + (sl_points * point))
                 sl_price = float(structural_ceiling) + (stop_buffer_points * point)
 
-                if target_level == "85" and proj_85 is not None:
-                    tp_price = float(proj_85)
-                elif target_level == "100" and proj_100 is not None:
-                    tp_price = float(proj_100)
+                if selected_target is not None:
+                    tp_price = float(selected_target)
                 else:
                     tp_price = float(proj_80) if proj_80 is not None else (entry_price - (tp_points * point))
 

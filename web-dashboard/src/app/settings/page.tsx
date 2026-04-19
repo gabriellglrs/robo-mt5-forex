@@ -242,7 +242,7 @@ const FACTORY_STRATEGY_SETTINGS = {
     sr_tolerance_points: 35,
     require_grouping: true,
     require_channel_break: true,
-    require_sr_touch: true,
+    require_sr_touch: false,
     max_spread_points: 30,
     require_pullback_retest: true,
     strict_reversal_logic: true,

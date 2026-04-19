@@ -35,6 +35,15 @@ def test_build_strategy_variations_includes_official_presets():
     assert len(variants) == len(OFFICIAL_PRESETS)
 
 
+def test_official_presets_contract():
+    assert OFFICIAL_PRESETS["FIM-010"]["require_grouping"] is True
+    assert OFFICIAL_PRESETS["FIM-010"]["require_channel_break"] is True
+    assert OFFICIAL_PRESETS["FIM-017"]["risk_percent"] == 0.8
+    assert OFFICIAL_PRESETS["FIM-017"]["pullback_tolerance_points"] == 24
+    assert OFFICIAL_PRESETS["FIM-018"]["require_grouping"] is False
+    assert OFFICIAL_PRESETS["FIM-018"]["breakout_buffer_points"] == 12
+
+
 def test_replay_backtest_returns_metrics_with_breakdown():
     candles = _candles_fixture()
     metrics, trades = run_replay_backtest(

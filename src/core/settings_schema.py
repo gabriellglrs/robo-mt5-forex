@@ -210,6 +210,39 @@ def validate_and_normalize_settings(settings: dict) -> dict:
             "combo invalido: max_spread_points < 20 para BTC/ETH costuma bloquear operacoes por spread em cripto."
         )
 
+    # Normalizacao explicita das opcoes de ciclo Fimathe (lock/target)
+    raw_top_level = signal_logic.get("fimathe_cycle_top_level", signal_logic.get("target_level_mode", "80"))
+    top_level = str(raw_top_level)
+    if top_level not in {"50", "80", "85", "90", "95", "100"}:
+        errors.append("signal_logic.fimathe_cycle_top_level: valores validos 50, 80, 85, 90, 95 ou 100.")
+    else:
+        signal_logic["fimathe_cycle_top_level"] = top_level
+        signal_logic["target_level_mode"] = top_level
+
+    management_mode = str(risk_management.get("fimathe_management_mode", "standard")).lower()
+    if management_mode not in {"standard", "conservative", "infinity"}:
+        errors.append("risk_management.fimathe_management_mode: valores validos standard, conservative ou infinity.")
+    else:
+        risk_management["fimathe_management_mode"] = management_mode
+
+    be_trigger = _to_int(
+        risk_management.get("fimathe_be_trigger_percent", 50),
+        "risk_management.fimathe_be_trigger_percent",
+        errors,
+    )
+    trail_step = _to_int(
+        risk_management.get("fimathe_trail_step_percent", 100),
+        "risk_management.fimathe_trail_step_percent",
+        errors,
+    )
+    _validate_range(be_trigger, "risk_management.fimathe_be_trigger_percent", 1, 100, errors)
+    _validate_range(trail_step, "risk_management.fimathe_trail_step_percent", 1, 1000, errors)
+    if be_trigger is not None:
+        risk_management["fimathe_be_trigger_percent"] = be_trigger
+    if trail_step is not None:
+        risk_management["fimathe_trail_step_percent"] = trail_step
+    risk_management["fimathe_cycle_enabled"] = bool(risk_management.get("fimathe_cycle_enabled", True))
+
     if errors:
         raise SettingsValidationError(errors)
     return normalized

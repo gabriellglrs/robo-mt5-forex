@@ -72,10 +72,9 @@ def test_minimum_lookback_enforcement(mock_signal_detector):
     # Forcar settings com lookback 3 (menor que o novo min de 7)
     mock_signal_detector.settings["ab_lookback_candles"] = 3
     df_trend = generate_mock_df(1.08000, 40, trend="UP")
-    
-    # Ele deve usar 7 mesmo que o setting diga 3
-    # Nao precisamos rodar o evaluate inteiro, so testar o _build_ab_projection
+
+    # Ele deve usar 7 mesmo que o setting diga 3.
     proj = mock_signal_detector._build_ab_projection(df_trend, "BUY")
-    # Se usasse 3, pegaria as ultimas 3 velas. Se usar 7, pega 7.
-    # Vamos conferir se o codigo do SignalDetector tem o max(7, ...)
-    assert mock_signal_detector._build_ab_projection.__code__.co_consts.count(7) >= 1 or True # Just a smoke test
+    last7 = df_trend.tail(7)
+    assert proj["point_a"] == float(last7["high"].max())
+    assert proj["point_b"] == float(last7["low"].min())
